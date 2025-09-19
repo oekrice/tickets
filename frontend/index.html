@@ -1,0 +1,81 @@
+<html>
+<header>
+    <title> Test page</title>
+</header>
+
+<body>
+    <div>Find train information between two stations. Input the data below and if it's fine it'll print some things.</div> 
+    <hr>
+    <div>
+        <label for="origin-input">Origin Station Code:</label>
+        <input type="text" id="origin-input", value = "NCL">
+        <!-- <button onclick="sendData()">Send data</button> -->
+    </div>
+    <div>
+        <label for="destination-input">Destination Station Code:</label>
+        <input type="text" id="destination-input", value = "YRK">
+        <!-- <button onclick="sendData()">Send data</button> -->
+    </div>
+    
+    <hr>
+    <div>
+        <button onclick="getTrains()">Get train data for today</button>
+    <div id="result-container"></div>
+    </div>
+</body>
+<script>
+   var xhr = null;
+    getXmlHttpRequestObject = function () {
+        if (!xhr) {
+            // Create a new XMLHttpRequest object 
+            xhr = new XMLHttpRequest();
+        }
+        return xhr;
+    }; 
+    function sendDataCallback() {
+        // Check response is ready or not
+        if (xhr.readyState == 4 && xhr.status == 201){
+            console.log("Data creation response received!");
+            dataDiv = document.getElementById('result-container');
+            dataDiv.innerHTML = xhr.responseText
+        }
+    }
+
+    function getTrains() {
+        //Send the parameters to Python and wait for a response...
+        let dataToSend = packageInputData();
+        console.log(dataToSend);
+        if (!dataToSend) {
+            console.log("Insufficient data entered. Aborting.");
+            return;I
+        }
+        xhr = getXmlHttpRequestObject();
+        xhr.onreadystatechange = sendDataCallback;   //wait for the ready state to change
+        // async requests
+        xhr.open("POST", "http://localhost:14752/trains", true);
+        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");    //Can send different types of data in this case
+        xhr.send(JSON.stringify(dataToSend));
+    }
+
+    function packageInputData(){
+        //This is for taking the input data, checking if it exists and compiling into a 'dictionary' for jsonifying. Not sure what the correct approach here is but I think it's the same as python...
+        originStation = document.getElementById('origin-input').value;
+        if (!originStation) {
+            console.log("No origin Station.");
+            document.getElementById("result-container").innerHTML = "Please input an origin station and try again.";
+            return;
+        }
+        destinationStation = document.getElementById('destination-input').value;
+        if (!destinationStation) {
+            console.log("No destination Station.");
+            document.getElementById("result-container").innerHTML = "Please input a destination station and try again.";
+            return;
+        }
+        document.getElementById("result-container").innerHTML = "Valid request submitted... Hopefully doing some Python now.";
+        //If it's got this far, there are at least origin and destination stations
+        inputParameters = {"origin":originStation, "destination":destinationStation};
+        return inputParameters;
+    }
+
+</script>
+</html>

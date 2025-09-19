@@ -1,0 +1,85 @@
+<html>
+<header>
+    <title> Test page</title>
+</header>
+
+<body>
+    <div>This is simple test to get data from a backend</div> 
+    <div><span>Last update: </span><span id="time-container"></span></div>
+    <div>
+        <label for="data-input">Data to send:</label>
+        <input type="text" id="data-input">
+        <button onclick="sendData()">Send data</button>
+    </div>
+    <div>
+        <div id="sent-data-container"></div>
+    </div>
+    <hr>
+    <div>
+        <button onclick="getTrains()">Get train data</button>
+    <div id="result-container"></div>
+    </div>
+</body>
+<script>
+   var xhr = null;
+    getXmlHttpRequestObject = function () {
+        if (!xhr) {
+            // Create a new XMLHttpRequest object 
+            xhr = new XMLHttpRequest();
+        }
+        return xhr;
+    }; 
+    function sendDataCallback() {
+        // Check response is ready or not
+        if (xhr.readystate == 4 && xhr.status == 201){
+            console.log("Data creation response received!");
+            getDate()
+            dataDiv = document.getElementById('sent-data-container');
+            dataDiv.innerHTML = xhr.responseText
+        }
+    }
+    function sendData() {
+        dataToSend = document.getElementById('data-input').value;
+        if (!dataToSend) {
+            console.log("Data is empty.");
+            return;
+        }
+        console.log("Sending data: " + dataToSend);
+        xhr = getXmlHttpRequestObject();
+        xhr.onreadystatechange = sendDataCallback;
+        // async requests
+        xhr.open("POST", "http://localhost:14752/users", true);
+        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");    //Can send different types of data in this case
+        xhr.send(JSON.stringify({"data": dataToSend}));
+        
+    }
+
+    function dataCallback() {
+        // Check response is ready or not
+        if (xhr.readyState == 4 && xhr.status == 200) {
+            console.log("User data received!");
+            getDate();
+            dataDiv = document.getElementById('result-container');
+            // Set current data text
+            dataDiv.innerHTML = xhr.responseText;
+        }
+    }
+    function getTrains() {
+        console.log("Get users...");
+        xhr = getXmlHttpRequestObject();
+        xhr.onreadystatechange = dataCallback;
+        // asynchronous requests
+        xhr.open("GET", "http://localhost:14752/trains", true);   //The true here means it is asynchronous
+        // Send the request over the network
+        xhr.send(null);  // This just doesn't send any more information
+    }
+    function getDate() {
+        date = new Date().toString();
+        document.getElementById('time-container').textContent
+            = date;
+    }
+    (function () {
+        getDate();
+    })();
+</script>
+</html>
