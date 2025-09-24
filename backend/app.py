@@ -5,6 +5,7 @@ import flask
 import json
 from flask_cors import CORS
 import time
+from obtain_data import find_basic_info
 
 app = Flask(__name__)
 CORS(app)
@@ -46,11 +47,13 @@ def trains():
         print("received data: %s" % input_data)
         origin = input_data['origin']
         destination = input_data['destination']
-        return_data = {
-            "status": "success",
-            "origin": origin,
-            "destination": destination
-        }
+
+        request_info = {"origin": origin, "destination": destination}   #Can add time constraints to this later
+        direct_journeys = find_basic_info(request_info)
+
+
+        return_data = direct_journeys
+
         time.sleep(1.0)
         print('Something happened')
         return flask.Response(response=json.dumps(return_data), status=201)

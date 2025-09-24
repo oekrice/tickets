@@ -1,0 +1,6 @@
+Train code log
+
+Created virtual environment for this:
+
+python3 -m venv .venv
+source .venv/bin/activate.csh
