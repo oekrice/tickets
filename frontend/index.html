@@ -4,7 +4,7 @@
 </header>
 
 <body>
-    <div>Find train information between two stations. Input the data below and if it's fine it'll print some things.</div> 
+    <div>Find train information between two stations. Input the data below and if it's fine it'll print some things.</div>
     <hr>
     <div>
         <label for="origin-input">Origin Station Code:</label>
@@ -20,11 +20,13 @@
     <hr>
     <div>
         <button onclick="getTrains()">Get train data for today</button>
+    <hr>
     <div id="result-container"></div>
     </div>
 </body>
 <script>
-   var xhr = null;
+   let raw_response
+   let xhr = null;
     getXmlHttpRequestObject = function () {
         if (!xhr) {
             // Create a new XMLHttpRequest object 
@@ -32,12 +34,13 @@
         }
         return xhr;
     }; 
+
     function sendDataCallback() {
         // Check response is ready or not
         if (xhr.readyState == 4 && xhr.status == 201){
             console.log("Data creation response received!");
             dataDiv = document.getElementById('result-container');
-            dataDiv.innerHTML = xhr.responseText
+            dataDiv.innerHTML = xhr.responseText;
         }
     }
 

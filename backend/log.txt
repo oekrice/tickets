@@ -4,3 +4,5 @@ Created virtual environment for this:
 
 python3 -m venv .venv
 source .venv/bin/activate.csh
+
+Basic example is working reasonably well, but is very slow. Need multithreading for the trains I think... Not sure how many one can get away with. Maybe set this up for every hour during the window, and Waterloo etc. will just take a little longer? Yes.

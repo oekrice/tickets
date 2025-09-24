@@ -51,11 +51,8 @@ def trains():
         request_info = {"origin": origin, "destination": destination}   #Can add time constraints to this later
         direct_journeys = find_basic_info(request_info)
 
-
         return_data = direct_journeys
 
-        time.sleep(1.0)
-        print('Something happened')
         return flask.Response(response=json.dumps(return_data), status=201)
 
 #This bit should come last, I think, as it calls things from above
