@@ -41,33 +41,48 @@
         }
     }
 
-    function getTrains() {
+    async function getTrains() {
         //Send the parameters to Python and wait for a response...
         let dataToSend = packageInputData();
         console.log(dataToSend);
         if (!dataToSend) {
             console.log("Insufficient data entered. Aborting.");
-            return;I
+            return;
         }
-        xhr = getXmlHttpRequestObject();
-        xhr.onreadystatechange = sendDataCallback;   //wait for the ready state to change
-        // async requests
-        xhr.open("POST", "http://localhost:14752/trains", true);
-        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");    //Can send different types of data in this case
-        xhr.send(JSON.stringify(dataToSend));
+
+        try {
+            // Send the POST request
+            const response = await fetch("http://localhost:14752/trains", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json;charset=UTF-8"
+                },
+                body: JSON.stringify(dataToSend)
+            });
+
+            if (response.status === 201) {
+                console.log("Data creation response received!");
+                const text = await response.text();
+                document.getElementById('result-container').innerHTML = text;
+            } else {
+                console.error("Request failed with status:", response.status);
+            }
+        } catch (error) {
+            console.error("Network error:", error);
+        }
     }
 
     function packageInputData(){
         //This is for taking the input data, checking if it exists and compiling into a 'dictionary' for jsonifying. Not sure what the correct approach here is but I think it's the same as python...
         originStation = document.getElementById('origin-input').value;
         if (!originStation) {
-            console.log("No origin Station.");
+            console.log("No origin station.");
             document.getElementById("result-container").innerHTML = "Please input an origin station and try again.";
             return;
         }
         destinationStation = document.getElementById('destination-input').value;
         if (!destinationStation) {
-            console.log("No destination Station.");
+            console.log("No destination station.");
             document.getElementById("result-container").innerHTML = "Please input a destination station and try again.";
             return;
         }
