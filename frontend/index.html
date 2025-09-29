@@ -1,7 +1,9 @@
-<html>
-<header>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
     <title> Test page</title>
-</header>
+</head>
 
 <body>
     <div>Find train information between two stations. Input the data below and if it's fine it'll print some things.</div>
@@ -23,23 +25,31 @@
     <hr>
     <div id="status-container"></div>
     <div id="result-container"></div>
+    <table id="outputTable" style="display:none">
+        <tr>
+            <th>Departure Time</th>
+            <th>Arrival Time</th>
+            <th>Price</th>
+        </tr>
+    </table>
+
     </div>
 </body>
 <script>
-   let raw_response
+    "use strict";
    let xhr = null;
-    getXmlHttpRequestObject = function () {
-        if (!xhr) {
-            // Create a new XMLHttpRequest object 
-            xhr = new XMLHttpRequest();
-        }
-        return xhr;
-    }; 
-
+    let originStation
+    let destinationStation
+    let inputParameters
+    let trainDataRaw, trainData
     async function getTrains() {
         //Send the parameters to Python and wait for a response...
-        let dataToSend = packageInputData();   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
-        console.log(dataToSend);
+        let requestStatus = 0
+        let dataToSend = packageInputData(requestStatus);   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
+        let resultInfo 
+        let parser, xmlDoc
+        parser = new DOMParser()
+        // console.log(dataToSend);
         if (!dataToSend) {
             console.log("Insufficient data entered. Aborting.");
             return;
@@ -57,9 +67,22 @@
 
             if (response.status === 201) {
                 console.log("Data creation response received!");
-                const text = await response.text();
-                document.getElementById('status-container').innerHTML = "Results found:";  //This is the bit which actually updates the result text, which is probably as a string. Would be better as an object...
-                document.getElementById('result-container').innerHTML = text;  //This is the bit which actually updates the result text, which is probably as a string. Would be better as an object...
+                trainDataRaw = await response.text();
+                trainData = JSON.parse(trainDataRaw)  //Object containing the train outputs
+                xmlDoc = parser.parseFromString(trainDataRaw,"text/xml")
+                //At this point trigger a function to enable the HTML to make a nice table of the results
+                makeResultTable(trainData)
+
+                //If no results found, say as much and don't display the table
+                if (trainData.length == 0) {
+                    resultInfo = "No trains found."
+                } else {
+                    resultInfo = trainData.length.toString() + " trains found:"
+                    document.getElementById("outputTable").style.display = "block";
+                }
+                document.getElementById("status-container").innerHTML = resultInfo;
+
+                //document.getElementById('result-container').innerHTML = trainDataRaw;  //This is the bit which actually updates the result text, which is probably as a string. Would be better as an object...
             } else {
                 console.error("Request failed with status:", response.status);
             }
@@ -68,7 +91,53 @@
         }
     }
 
-    function packageInputData(){
+    function toTime(rawTime){
+        //Just a simple function to convert a raw time to a hh:mm etc.
+        if (rawTime.length == 4) {
+            return String(rawTime).substring(0,2) + ":" + String(rawTime).substring(2,4);
+        } else {
+            return "0" + String(rawTime).substring(0,1) + ":" + String(rawTime).substring(1,3);
+        }
+    }
+
+    function toPrice(rawPrice){
+        //Just a simple function to convert price to the correct format
+        return "£" + rawPrice.toFixed(2);
+    }
+
+
+    function makeResultTable(trainData){
+        //Uses the raw train Data and outputs in a nice table, which can be made pretty in due course
+        //This is very ugly but hopefully won't be too slow...
+        //Need to make sure that the table is made afresh each time.
+        let outputTable = document.getElementById("outputTable");
+        //Clear the existing results
+        let rows = outputTable.rows;
+        let i = rows.length;
+        let newRow, newCell, newText
+        let depTime, arrTime;
+        while (--i) {
+            outputTable.deleteRow(i)
+        }
+        for (let i = 0; i < trainData.length; i ++){
+            newRow = outputTable.insertRow(-1);
+
+            newCell = newRow.insertCell(0);
+            newText = document.createTextNode(toTime(trainData[i].dep_time));            //newCell.appendChild(toTime(newText));
+            newCell.appendChild(newText);
+
+            newCell = newRow.insertCell(1);
+            newText = document.createTextNode(toTime(trainData[i].arr_time));
+            newCell.appendChild(newText);
+          
+            newCell = newRow.insertCell(2);
+            console.log(toPrice(trainData[i].price))
+            newText = document.createTextNode(toPrice(trainData[i].price));
+            newCell.appendChild(newText);
+        }
+    }
+
+    function packageInputData(requestStatus){
         //This is for taking the input data, checking if it exists and compiling into a 'dictionary' for jsonifying. Not sure what the correct approach here is but I think it's the same as python...
         originStation = document.getElementById('origin-input').value;
         if (!originStation) {
@@ -82,9 +151,18 @@
             document.getElementById("status-container").innerHTML = "Please input a destination station and try again.";
             return;
         }
-        document.getElementById("status-container").innerHTML = "Potentially valid request submitted... Hopefully the backend is doing something now.";
+
+        //If this is the first request (status == 0) then print as much. If not keep the current results
+        if (requestStatus == 0){
+            document.getElementById("status-container").innerHTML = "Potentially valid request submitted... Hopefully the backend is doing something now.";
+            document.getElementById("result-container").innerHTML = "";
+            document.getElementById("outputTable").style.display = "none";
+        } else {
+            document.getElementById("status-container").innerHTML = "Finding more tickets (may take a while...)";
+        }
+        
         //If it's got this far, there are at least origin and destination stations
-        inputParameters = {"origin":originStation, "destination":destinationStation};
+        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation};
         return inputParameters;
     }
 
