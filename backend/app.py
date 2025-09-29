@@ -6,6 +6,8 @@ import json
 from flask_cors import CORS
 import time
 from obtain_data import find_basic_info
+from datetime import datetime as dt, timedelta
+import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -39,11 +41,12 @@ def trains():
     if request.method == "POST":
         #Get the data from the input
         input_data = request.get_json()
-        print("received data: %s" % input_data)
         origin = input_data['origin']
         destination = input_data['destination']
-
-        request_info = {"origin": origin, "destination": destination}   #Can add time constraints to this later. Or immediately? Yes, that should be the next thing.
+        date = dt.strptime(input_data['date'].strip(), "%Y-%m-%d").date()
+        arrive_time = dt.strptime(input_data['arriveTime'].strip(), "%H:%M").time()
+        depart_time = dt.strptime(input_data['departTime'].strip(), "%H:%M").time()
+        request_info = {"origin": origin, "destination": destination, "date": date, "start_time": depart_time, "end_time": arrive_time}   #Can add time constraints to this later. Or immediately? Yes, that should be the next thing.
         direct_journeys = find_basic_info(request_info)
 
         return_data = direct_journeys

@@ -27,11 +27,11 @@ tr:nth-child(even) {
     <hr>
     <div>
         <label for="origin-input">Origin Station Code: </label>
-        <input type="text" id="origin-input", value = "KGX">
+        <input type="text" id="origin-input", value = "NCL">
     </div>
     <div>
         <label for="destination-input">Destination Station Code:</label>
-        <input type="text" id="destination-input", value = "WGC">
+        <input type="text" id="destination-input", value = "YRK">
     </div>
     <div>
         <label for="date-input">Date of Travel:</label>
@@ -49,7 +49,7 @@ tr:nth-child(even) {
 
     <hr>
     <div>
-        <button onclick=getTrains()>Get train data for today</button>
+        <button onclick=getTrains()>Get train data</button>
     <hr>
     <div id="status-container"></div>
     <div id="result-container"></div>
@@ -141,7 +141,7 @@ tr:nth-child(even) {
     function getDefaults(){
         //Get default parameters for the search fields (current time until midnight)
         let today = new Date();
-        let fivemins = new Date(today)
+        let fivemins = new Date()
         fivemins.setMinutes(fivemins.getMinutes() + 5)
         let todayString = today.toISOString().split('T')[0];
         let timeString = String(fivemins.getHours()).padStart(2,'0') + ":" + String(fivemins.getMinutes()).padStart(2,'0')
@@ -175,9 +175,7 @@ tr:nth-child(even) {
         time1.setMinutes(depTime.substring(2,4));
         time2.setHours(arrTime.substring(0,2));
         time2.setMinutes(arrTime.substring(2,4));
-        console.log(time1, time2)
         timeDiff = new Date(time2 - time1);
-        console.log(timeDiff)
         return timeDiff;
     }
 
@@ -213,7 +211,6 @@ tr:nth-child(even) {
 
             //Calculate the journey time here, as that's a useful thing to have
             journeyTime = findJourneyTime(trainData[i].dep_time, trainData[i].arr_time)
-            console.log(trainData[i].dep_time, trainData[i].arr_time)
             newCell = newRow.insertCell(3);
             if (journeyTime.getUTCHours() < 1){
                 newText = document.createTextNode(journeyTime.getUTCMinutes() + "m");
@@ -282,7 +279,8 @@ tr:nth-child(even) {
         }
         
         //If it's got this far, there are at least origin and destination stations
-        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":todayString, "departTime": departTime, "arriveTime": arriveTime};
+        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":trainDate, "departTime": departTime, "arriveTime": arriveTime};
+        console.log(inputParameters)
         return inputParameters;
     }
 

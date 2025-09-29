@@ -28,14 +28,20 @@ def find_basic_info(input_parameters):
     destination = input_parameters["destination"]
     overall_start_time = t_start
 
-    multithread_cadence = 60  #Cadence in minutes for the remaining hours of the day. This will need playing with a bit.
+    multithread_cadence = 60  #Cadence in minutes for the remaining hours of the day. This will need playing with a bit to optimise I imagine.
 
     #Establish the required start times here
+    go = True
     start_times = []
     start_time = overall_start_time
-    while start_time >= overall_start_time:
+    while go:
         start_times.append(start_time)
         start_time =  (dt.combine(date_search, start_time) + timedelta(minutes=multithread_cadence)).time()
+        if start_time > t_end:
+            go = False
+        if len(start_times) > 1:
+            if start_time < start_times[-1]:
+                go = False
 
     def append_to_journeys(local_start, local_end, journeys):
         go = True
