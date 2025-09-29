@@ -35,12 +35,7 @@ def users():
     
 @app.route('/trains', methods = ["GET", "POST"])
 def trains():
-    print('Testing obtaining train info')
-    if request.method == "GET": #Obtain some data
-        with open ("users.json", "r") as f:
-            data = [{"train_id":0, "origin":"NCL", "destination":"YRK"}]
-            #data = json.load(f)
-            return flask.jsonify(data)
+    print('Testing obtaining train info')        
     if request.method == "POST":
         #Get the data from the input
         input_data = request.get_json()
@@ -48,7 +43,7 @@ def trains():
         origin = input_data['origin']
         destination = input_data['destination']
 
-        request_info = {"origin": origin, "destination": destination}   #Can add time constraints to this later
+        request_info = {"origin": origin, "destination": destination}   #Can add time constraints to this later. Or immediately? Yes, that should be the next thing.
         direct_journeys = find_basic_info(request_info)
 
         return_data = direct_journeys

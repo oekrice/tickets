@@ -21,6 +21,7 @@
     <div>
         <button onclick="getTrains()">Get train data for today</button>
     <hr>
+    <div id="status-container"></div>
     <div id="result-container"></div>
     </div>
 </body>
@@ -35,18 +36,9 @@
         return xhr;
     }; 
 
-    function sendDataCallback() {
-        // Check response is ready or not
-        if (xhr.readyState == 4 && xhr.status == 201){
-            console.log("Data creation response received!");
-            dataDiv = document.getElementById('result-container');
-            dataDiv.innerHTML = xhr.responseText;
-        }
-    }
-
     async function getTrains() {
         //Send the parameters to Python and wait for a response...
-        let dataToSend = packageInputData();
+        let dataToSend = packageInputData();   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
         console.log(dataToSend);
         if (!dataToSend) {
             console.log("Insufficient data entered. Aborting.");
@@ -66,7 +58,8 @@
             if (response.status === 201) {
                 console.log("Data creation response received!");
                 const text = await response.text();
-                document.getElementById('result-container').innerHTML = text;
+                document.getElementById('status-container').innerHTML = "Results found:";  //This is the bit which actually updates the result text, which is probably as a string. Would be better as an object...
+                document.getElementById('result-container').innerHTML = text;  //This is the bit which actually updates the result text, which is probably as a string. Would be better as an object...
             } else {
                 console.error("Request failed with status:", response.status);
             }
@@ -80,16 +73,16 @@
         originStation = document.getElementById('origin-input').value;
         if (!originStation) {
             console.log("No origin station.");
-            document.getElementById("result-container").innerHTML = "Please input an origin station and try again.";
+            document.getElementById("status-container").innerHTML = "Please input an origin station and try again.";
             return;
         }
         destinationStation = document.getElementById('destination-input').value;
         if (!destinationStation) {
             console.log("No destination station.");
-            document.getElementById("result-container").innerHTML = "Please input a destination station and try again.";
+            document.getElementById("status-container").innerHTML = "Please input a destination station and try again.";
             return;
         }
-        document.getElementById("result-container").innerHTML = "Valid request submitted... Hopefully doing some Python now.";
+        document.getElementById("status-container").innerHTML = "Potentially valid request submitted... Hopefully the backend is doing something now.";
         //If it's got this far, there are at least origin and destination stations
         inputParameters = {"origin":originStation, "destination":destinationStation};
         return inputParameters;
