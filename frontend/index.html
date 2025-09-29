@@ -27,14 +27,15 @@ tr:nth-child(even) {
     <hr>
     <div>
         <label for="origin-input">Origin Station Code: </label>
-        <input type="text" id="origin-input", value = "NCL">
+        <input type="text" id="origin-input", value = "KGX">
     </div>
     <div>
         <label for="destination-input">Destination Station Code:</label>
-        <input type="text" id="destination-input", value = "YRK">
+        <input type="text" id="destination-input", value = "WGC">
     </div>
     <div>
         <label for="date-input">Date of Travel:</label>
+        <!-- Need to obtain date bounds here. Not trivial-->        
         <input type="date" id="date-input">
     </div>
     <div>
@@ -48,7 +49,7 @@ tr:nth-child(even) {
 
     <hr>
     <div>
-        <button onclick="getTrains()">Get train data for today</button>
+        <button onclick=getTrains()>Get train data for today</button>
     <hr>
     <div id="status-container"></div>
     <div id="result-container"></div>
@@ -57,6 +58,7 @@ tr:nth-child(even) {
             <th>Departs</th>
             <th>Arrives</th>
             <th>Price</th>
+            <th>Journey Time</th>
         </tr>
     </table>
 
@@ -65,10 +67,14 @@ tr:nth-child(even) {
 <script>
     "use strict";
    let xhr = null;
-    let originStation
-    let destinationStation
+    let originStation, destinationStation
+    let trainDate, departTime, arriveTime
     let inputParameters
     let trainDataRaw, trainData
+
+    //Update default parameters in the search bar (date etc.)
+    getDefaults()
+
     async function getTrains() {
         //Send the parameters to Python and wait for a response...
         let requestStatus = 0
@@ -93,7 +99,7 @@ tr:nth-child(even) {
             });
 
             if (response.status === 201) {
-                console.log("Data creation response received!");
+                // console.log("Data creation response received!");
                 trainDataRaw = await response.text();
                 trainData = JSON.parse(trainDataRaw)  //Object containing the train outputs
                 xmlDoc = parser.parseFromString(trainDataRaw,"text/xml")
@@ -104,7 +110,7 @@ tr:nth-child(even) {
                 if (trainData.length == 0) {
                     resultInfo = "No trains found."
                 } else {
-                    resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + " :"
+                    resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ":"
                     document.getElementById("outputTable").style.display = "block";
                 }
                 document.getElementById("status-container").innerHTML = resultInfo;
@@ -132,6 +138,48 @@ tr:nth-child(even) {
         return "£" + rawPrice.toFixed(2);
     }
 
+    function getDefaults(){
+        //Get default parameters for the search fields (current time until midnight)
+        let today = new Date();
+        let fivemins = new Date(today)
+        fivemins.setMinutes(fivemins.getMinutes() + 5)
+        let todayString = today.toISOString().split('T')[0];
+        let timeString = String(fivemins.getHours()).padStart(2,'0') + ":" + String(fivemins.getMinutes()).padStart(2,'0')
+        document.getElementById('date-input').value = todayString;
+        document.getElementById('date-input').min = todayString;
+        //document.getElementById('depart-time-input').min = timeString;
+        document.getElementById('depart-time-input').value = timeString;
+        document.getElementById('arrive-time-input').value = "23:59";
+        document.getElementById('arrive-time-input').min = timeString;
+    }
+
+    function updateTimeBounds(){
+        //If the arrive time changes etc., then make sure departure isn't after it. May be a tad tricky to get all the possibilities here...
+        //If today then make sure depart time is greater than now, but not otherwise
+        let today = new Date();
+        let todayString = today.toISOString().split('T')[0];
+        let timeString = today.getHours() + ":" + today.getMinutes()
+        if (document.getElementById('date-input').value == todayString){
+            document.getElementById('date-input').min = todayString;
+        } else {
+            document.getElementById('date-input').min = "00:00";
+        }
+    }
+
+    function findJourneyTime(depTime, arrTime){
+        //Using the departure and arrival time in the standard string format, output the journey time.
+        let time1 = new Date();
+        let time2 = new Date();
+        let timeDiff = new Date();
+        time1.setHours(depTime.substring(0,2));
+        time1.setMinutes(depTime.substring(2,4));
+        time2.setHours(arrTime.substring(0,2));
+        time2.setMinutes(arrTime.substring(2,4));
+        console.log(time1, time2)
+        timeDiff = new Date(time2 - time1);
+        console.log(timeDiff)
+        return timeDiff;
+    }
 
     function makeResultTable(trainData){
         //Uses the raw train Data and outputs in a nice table, which can be made pretty in due course
@@ -141,8 +189,10 @@ tr:nth-child(even) {
         //Clear the existing results
         let rows = outputTable.rows;
         let i = rows.length;
-        let newRow, newCell, newText
+        let newRow, newCell, newText;
         let depTime, arrTime;
+        let journeyTime = new Date()
+
         while (--i) {
             outputTable.deleteRow(i)
         }
@@ -150,7 +200,7 @@ tr:nth-child(even) {
             newRow = outputTable.insertRow(-1);
 
             newCell = newRow.insertCell(0);
-            newText = document.createTextNode(toTime(trainData[i].dep_time));            //newCell.appendChild(toTime(newText));
+            newText = document.createTextNode(toTime(trainData[i].dep_time));           
             newCell.appendChild(newText);
 
             newCell = newRow.insertCell(1);
@@ -160,25 +210,69 @@ tr:nth-child(even) {
             newCell = newRow.insertCell(2);
             newText = document.createTextNode(toPrice(trainData[i].price));
             newCell.appendChild(newText);
+
+            //Calculate the journey time here, as that's a useful thing to have
+            journeyTime = findJourneyTime(trainData[i].dep_time, trainData[i].arr_time)
+            console.log(trainData[i].dep_time, trainData[i].arr_time)
+            newCell = newRow.insertCell(3);
+            if (journeyTime.getUTCHours() < 1){
+                newText = document.createTextNode(journeyTime.getUTCMinutes() + "m");
+            } else {
+                newText = document.createTextNode(journeyTime.getUTCHours() + "h" + journeyTime.getUTCMinutes());
+            }
+            newCell.appendChild(newText);
         }
     }
 
     function packageInputData(requestStatus){
+        let departMinutes, arriveMinutes
         //This is for taking the input data, checking if it exists and compiling into a 'dictionary' for jsonifying. Not sure what the correct approach here is but I think it's the same as python...
         originStation = document.getElementById('origin-input').value;
         if (!originStation) {
             console.log("No origin station.");
             document.getElementById("status-container").innerHTML = "Please input an origin station and try again.";
+            document.getElementById("result-container").innerHTML = "";
+            document.getElementById("outputTable").style.display = "none";
             return;
         }
+
         destinationStation = document.getElementById('destination-input').value;
         if (!destinationStation) {
             console.log("No destination station.");
             document.getElementById("status-container").innerHTML = "Please input a destination station and try again.";
+            document.getElementById("result-container").innerHTML = "";
+            document.getElementById("outputTable").style.display = "none";
             return;
         }
 
-        //If this is the first request (status == 0) then print as much. If not keep the current results
+        trainDate = document.getElementById('date-input').value;
+        departTime = document.getElementById('depart-time-input').value;
+        arriveTime = document.getElementById('arrive-time-input').value;
+        
+        //Do some checks on the valid times. Need converting to a date for that.
+        departMinutes = departTime.substring(0,2) + departTime.substring(3,5)
+        if (departTime.substring(0,2) + departTime.substring(3,5) > arriveTime.substring(0,2) + arriveTime.substring(3,5)){
+            console.log("Departs after arrives");
+            document.getElementById("status-container").innerHTML = "Arrival time must be after departure time.";
+            document.getElementById("result-container").innerHTML = "";
+            document.getElementById("outputTable").style.display = "none";
+            return;
+        }
+
+        //If the input is today, check that the departure time isn't earlier than now
+        let today = new Date();
+        let todayString = today.toISOString().split('T')[0];
+        let timeString = String(today.getHours()).padStart(2,'0') + ":" + String(today.getMinutes()).padStart(2,'0')
+        if (document.getElementById('date-input').value == todayString){
+            if (timeString.substring(0,2) + timeString.substring(3,5) > departTime.substring(0,2) + departTime.substring(3,5)){
+                console.log("Departs in the past");
+                document.getElementById("status-container").innerHTML = "Departure time must not be in the past.";
+                document.getElementById("result-container").innerHTML = "";
+                document.getElementById("outputTable").style.display = "none";
+                return
+            }
+        }
+        //If this is the first request (status == 0) then print as much. If not keep the current results. Not sure what I meant by that now.
         if (requestStatus == 0){
             document.getElementById("status-container").innerHTML = "Potentially valid request submitted... Hopefully the backend is doing something now.";
             document.getElementById("result-container").innerHTML = "";
@@ -188,7 +282,7 @@ tr:nth-child(even) {
         }
         
         //If it's got this far, there are at least origin and destination stations
-        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation};
+        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":todayString, "departTime": departTime, "arriveTime": arriveTime};
         return inputParameters;
     }
 
