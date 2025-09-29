@@ -3,22 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <title> Test page</title>
+
+    <style>
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  text-align: center;
+  padding: 8px;
+}
+
+tr:nth-child(even) {
+  background-color: #ffe15b;
+}
+
+</style>
 </head>
 
 <body>
-    <div>Find train information between two stations. Input the data below and if it's fine it'll print some things.</div>
+    <div>Find train information between two stations. Input your requirements and if it's fine it'll print some things.</div>
     <hr>
     <div>
-        <label for="origin-input">Origin Station Code:</label>
+        <label for="origin-input">Origin Station Code: </label>
         <input type="text" id="origin-input", value = "NCL">
-        <!-- <button onclick="sendData()">Send data</button> -->
     </div>
     <div>
         <label for="destination-input">Destination Station Code:</label>
         <input type="text" id="destination-input", value = "YRK">
-        <!-- <button onclick="sendData()">Send data</button> -->
     </div>
-    
+    <div>
+        <label for="date-input">Date of Travel:</label>
+        <input type="date" id="date-input">
+    </div>
+    <div>
+        <label for="depart-time-input">Depart After:</label>
+        <input type="time" id="depart-time-input">
+    </div>
+    <div>
+        <label for="arrive-time-input">Arrive Before:</label>
+        <input type="time" id="arrive-time-input">
+    </div>
+
     <hr>
     <div>
         <button onclick="getTrains()">Get train data for today</button>
@@ -27,8 +54,8 @@
     <div id="result-container"></div>
     <table id="outputTable" style="display:none">
         <tr>
-            <th>Departure Time</th>
-            <th>Arrival Time</th>
+            <th>Departs</th>
+            <th>Arrives</th>
             <th>Price</th>
         </tr>
     </table>
@@ -77,7 +104,7 @@
                 if (trainData.length == 0) {
                     resultInfo = "No trains found."
                 } else {
-                    resultInfo = trainData.length.toString() + " trains found:"
+                    resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + " :"
                     document.getElementById("outputTable").style.display = "block";
                 }
                 document.getElementById("status-container").innerHTML = resultInfo;
@@ -131,7 +158,6 @@
             newCell.appendChild(newText);
           
             newCell = newRow.insertCell(2);
-            console.log(toPrice(trainData[i].price))
             newText = document.createTextNode(toPrice(trainData[i].price));
             newCell.appendChild(newText);
         }
