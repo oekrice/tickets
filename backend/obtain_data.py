@@ -7,6 +7,7 @@ import threading
 import json
 import geopy
 import numpy as np
+import os
 #This is for obtaining the data
 
 def makeurl_nr(origin, destination, date_search, page_start_time, arr_flag = False):
@@ -153,12 +154,23 @@ def find_basic_info(input_parameters, alljourneys = []):
 
 def find_station_info(request_info):
 
+    origin = request_info['origin']
+    destination = request_info['destination']
+    filename = "./station_data/%s_%s.json" % (origin, destination)
+    ignore_previous = request_info.get("ignore_previous",False)
+
+    #Initially check if a file for this combination already exists, and if so use that
+    if os.path.exists(filename) and not ignore_previous:
+        try:
+            with open(filename) as f:
+                station_data = json.load(f)
+            return station_data
+        except:
+            print('File is corrupted or something. Igoring it and running the search again...')
+
     #This should be roughly similar for the same pair of stations each time, so can probably be cached or equivalent. It's certainly quite slow :(
 
     max_deviation = request_info.get("max_deviation",0.2)   #How far off the route to go. Some can really get quite improbable so it's worth setting this quite high...
-    
-    origin = request_info['origin']
-    destination = request_info['destination']
     all_station_data = json.loads(open('./station_info.json').read())
     station_data = {}; station_list = []
     x0 = (all_station_data[origin]['latitude'], all_station_data[origin]['longitude']); x2 = (all_station_data[destination]['latitude'], all_station_data[destination]['longitude'])
@@ -183,6 +195,7 @@ def find_station_info(request_info):
     nlumps = int(len(station_list)/(nrequests_max/2) + 1)
     nrequests_actual = len(station_list)/nlumps + 1
     modified_request_info = request_info.copy()
+    modified_request_info["date"] = request_info["date"] + timedelta(days = 7)   #Look a week ahead of the actual request time. For reasons I'm deciding which are entirely arbitrary.
     modified_request_info["start_time"] = datetime.time(9,00)
     modified_request_info["end_time"] = datetime.time(23,59)
     for lump in range(nlumps):
@@ -210,6 +223,7 @@ def find_station_info(request_info):
         for j, x in enumerate(threads):
             x.join()
 
+        print('%d percent of stations checked...' % (100*maxstat/len(station_list)))
     reftime = 1e6
     for journeys in alljourneys:
         if len(journeys) > 0:
@@ -238,12 +252,11 @@ def find_station_info(request_info):
             time_score = station_data[station]['time1'] + station_data[station]['time2'] - reftime
             price1 = np.abs(station_data[station]['price1']/station_data[station]['progress'])
             price2 = np.abs(station_data[station]['price2']/(1.0 - station_data[station]['progress']))
+            print(station, station_data[station]['price1'], station_data[station]['price2'], price1, price2, station_data[station]['progress'])
             price_score = min(price1, price2)
             final_station_data[station] = {"time_score":time_score, "price_score":price_score}
-            print(station, final_station_data[station])
-    filename = "./station_data/%s_%s.json" % (origin, destination)
     with open(filename, "w") as f:
         json.dump(final_station_data, f)
     #We're using alljourneys here ONLY to rank the stations with rough prices, and don't actually care about whether these journeys are doable. That comes later. So for now this is probably fine to be as-is.
     #It might be worth changing the parameters here to be a generic midday time or something? Actually, let's just do that. In a minute.
-    return
+    return final_station_data
