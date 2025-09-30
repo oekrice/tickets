@@ -1,37 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <title> Test page</title>
+    <link rel="stylesheet" href="style.css">
 
-    <style>
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-th, td {
-  text-align: center;
-  padding: 8px;
-}
-
-tr:nth-child(even) {
-  background-color: #ffe15b;
-}
-
-</style>
 </head>
 
 <body>
     <div>Find train information between two stations. Input your requirements and if it's fine it'll print some things.</div>
     <hr>
     <div>
-        <label for="origin-input">Origin Station Code: </label>
-        <input type="text" id="origin-input", value = "NCL">
+        <label for="origin-input">Origin Station: </label>
+        <input  list="station-list" id="origin-input" placeholder = "Newcastle (NCL)"> 
+        <datalist id="station-list">
     </div>
     <div>
-        <label for="destination-input">Destination Station Code:</label>
-        <input type="text" id="destination-input", value = "YRK">
+        <label for="destination-input">Destination Station:</label>
+        <input  list="station-list" id="destination-input"  placeholder = "York (YRK)"> 
     </div>
     <div>
         <label for="date-input">Date of Travel:</label>
@@ -66,14 +52,14 @@ tr:nth-child(even) {
 </body>
 <script>
     "use strict";
-   let xhr = null;
+    let xhr = null;
     let originStation, destinationStation
     let trainDate, departTime, arriveTime
     let inputParameters
     let trainDataRaw, trainData
-
-    //Update default parameters in the search bar (date etc.)
-    getDefaults()
+    let stationData
+    //Update default parameters in the search bar (date etc.) and obtain the list of allowed stations
+    getDefaults();
 
     async function getTrains() {
         //Send the parameters to Python and wait for a response...
@@ -139,6 +125,7 @@ tr:nth-child(even) {
     }
 
     function getDefaults(){
+
         //Get default parameters for the search fields (current time until midnight)
         let today = new Date();
         let fivemins = new Date()
@@ -151,6 +138,26 @@ tr:nth-child(even) {
         document.getElementById('depart-time-input').value = timeString;
         document.getElementById('arrive-time-input').value = "23:59";
         document.getElementById('arrive-time-input').min = timeString;
+
+        //Add a bit which can get the list of stations (obtained from the dictionary file)
+        async function loadStations() {
+        const response = await fetch('./station_info.json');
+        const data = await response.json();
+        return data;
+        }
+
+        loadStations().then(stationData => {
+            stationData;
+            let stationTitle, fullTitle
+            let options = ""
+            //Populate the station data as soon as this is loaded? I think that might be what you're meant to do with these things... Async is a bit funny
+            for (const key in stationData){
+                stationTitle = stationData[key].station_name.substring(0,stationData[key].station_name.length-13) + " (" + key + ")"
+                options +=  "<option value='" + stationTitle +"'>"
+            }
+            document.getElementById('station-list').innerHTML = options;
+        })
+
     }
 
     function updateTimeBounds(){
@@ -225,21 +232,25 @@ tr:nth-child(even) {
         let departMinutes, arriveMinutes
         //This is for taking the input data, checking if it exists and compiling into a 'dictionary' for jsonifying. Not sure what the correct approach here is but I think it's the same as python...
         originStation = document.getElementById('origin-input').value;
+        originStation = String(originStation).substring(originStation.length-4,originStation.length-1)
         if (!originStation) {
-            console.log("No origin station.");
-            document.getElementById("status-container").innerHTML = "Please input an origin station and try again.";
-            document.getElementById("result-container").innerHTML = "";
-            document.getElementById("outputTable").style.display = "none";
-            return;
+            originStation = "NCL"
+            // console.log("No origin station.");
+            // document.getElementById("status-container").innerHTML = "Please input an origin station and try again.";
+            // document.getElementById("result-container").innerHTML = "";
+            // document.getElementById("outputTable").style.display = "none";
+            // return;
         }
 
         destinationStation = document.getElementById('destination-input').value;
+        destinationStation = String(destinationStation).substring(destinationStation.length-4,destinationStation.length-1)
         if (!destinationStation) {
-            console.log("No destination station.");
-            document.getElementById("status-container").innerHTML = "Please input a destination station and try again.";
-            document.getElementById("result-container").innerHTML = "";
-            document.getElementById("outputTable").style.display = "none";
-            return;
+            destinationStation = "YRK"
+            // console.log("No destination station.");
+            // document.getElementById("status-container").innerHTML = "Please input a destination station and try again.";
+            // document.getElementById("result-container").innerHTML = "";
+            // document.getElementById("outputTable").style.display = "none";
+            // return;
         }
 
         trainDate = document.getElementById('date-input').value;
