@@ -5,7 +5,7 @@ import requests
 from lxml import html
 import threading
 import json
-import geopy
+from geopy.distance import geodesic
 import numpy as np
 import os
 #This is for obtaining the data
@@ -174,12 +174,12 @@ def find_station_info(request_info):
     all_station_data = json.loads(open('./station_info.json').read())
     station_data = {}; station_list = []
     x0 = (all_station_data[origin]['latitude'], all_station_data[origin]['longitude']); x2 = (all_station_data[destination]['latitude'], all_station_data[destination]['longitude'])
-    dref = geopy.distance.distance(x0, x2).miles
+    dref = geodesic(x0, x2).miles
     print('Loaded', len(all_station_data), 'stations initially')
     for station in all_station_data:
         add_station = True   #Only add this to the final list if it satisfies various requirements
         x1 = (all_station_data[station]['latitude'], all_station_data[station]['longitude'])
-        d0 = geopy.distance.distance(x0, x1).miles; d1 = geopy.distance.distance(x1, x2).miles
+        d0 = geodesic(x0, x1).miles; d1 = geodesic(x1, x2).miles
         all_station_data[station]["deviation"] = (d0 + d1)/dref - 1.   #Extra distance to go via this station
         all_station_data[station]["progress"] = (dref**2 + d0**2 - d1**2)/(2*dref**2)  #Proportion of the progress to the destination station by visiting here. A bit nuanced I think as to what's best here.
         if all_station_data[station]["deviation"] > max_deviation:

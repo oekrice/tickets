@@ -5,7 +5,8 @@ import flask
 import json
 from flask_cors import CORS
 import time
-from obtain_data import find_basic_info
+from obtain_data import find_basic_info, find_station_info
+from data_functions import rank_stations, find_first_splits, filter_splits
 from datetime import datetime as dt, timedelta
 import datetime
 
@@ -46,10 +47,32 @@ def trains():
         date = dt.strptime(input_data['date'].strip(), "%Y-%m-%d").date()
         arrive_time = dt.strptime(input_data['arriveTime'].strip(), "%H:%M").time()
         depart_time = dt.strptime(input_data['departTime'].strip(), "%H:%M").time()
-        request_info = {"origin": origin, "destination": destination, "date": date, "start_time": depart_time, "end_time": arrive_time}   #Can add time constraints to this later. Or immediately? Yes, that should be the next thing.
-        direct_journeys = find_basic_info(request_info)
 
-        return_data = direct_journeys
+        if input_data['requestStatus'] == 0:  #Just look for the direct trains (no splitting)
+            request_info = {"origin": origin, "destination": destination, "date": date, "start_time": depart_time, "end_time": arrive_time}   #Can add time constraints to this later. Or immediately? Yes, that should be the next thing.
+            direct_journeys = find_basic_info(request_info)
+
+            return_data = direct_journeys
+
+        if input_data['requestStatus'] == 1:  #Look for single splits
+            request_info = {"origin": origin, 
+                            "destination": destination, 
+                            "date": date, 
+                            "start_time": depart_time, 
+                            "end_time": arrive_time,
+                            "ignore_previous": False,
+                            "nchecks_init":20,
+                            "max_extra_time":125, 
+                            "time_spread":20
+                            }  
+            station_info = find_station_info(request_info)   #This will attempt to rank the stations in the request based on geography, THEN other things like timing and price (which will take a request).
+            print('Found stations')
+            station_checks = rank_stations(request_info, station_info)
+            print('Finding splits...')
+            single_splits_unfiltered = find_first_splits(request_info, station_checks)
+            print('Found splits. Filtering them.')
+
+            return_data = filter_splits(request_info, single_splits_unfiltered)
 
         return flask.Response(response=json.dumps(return_data), status=201)
 

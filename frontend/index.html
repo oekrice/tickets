@@ -35,7 +35,7 @@
 
     <hr>
     <div>
-        <button onclick=getTrains()>Get train data</button>
+        <button onclick=getTrains(0)>Get basic train data</button><button onclick=getTrains(1)>Get split ticket data</button>
     <hr>
     <div id="status-container"></div>
     <div id="result-container"></div>
@@ -61,9 +61,9 @@
     //Update default parameters in the search bar (date etc.) and obtain the list of allowed stations
     getDefaults();
 
-    async function getTrains() {
+    async function getTrains(requestStatus) {
         //Send the parameters to Python and wait for a response...
-        let requestStatus = 0
+        //let requestStatus = 1
         let dataToSend = packageInputData(requestStatus);   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
         let resultInfo 
         let parser, xmlDoc
@@ -128,16 +128,20 @@
 
         //Get default parameters for the search fields (current time until midnight)
         let today = new Date();
-        let fivemins = new Date()
+        let fivemins = new Date();
+        let threehours = new Date();
         fivemins.setMinutes(fivemins.getMinutes() + 5)
+        threehours.setMinutes(threehours.getMinutes() + 180)
+        console.log(threehours)
         let todayString = today.toISOString().split('T')[0];
         let timeString = String(fivemins.getHours()).padStart(2,'0') + ":" + String(fivemins.getMinutes()).padStart(2,'0')
         document.getElementById('date-input').value = todayString;
         document.getElementById('date-input').min = todayString;
         //document.getElementById('depart-time-input').min = timeString;
         document.getElementById('depart-time-input').value = timeString;
-        document.getElementById('arrive-time-input').value = "23:59";
-        document.getElementById('arrive-time-input').min = timeString;
+        timeString = String(threehours.getHours()).padStart(2,'0') + ":" + String(threehours.getMinutes()).padStart(2,'0')
+        document.getElementById('arrive-time-input').value = timeString;
+        //document.getElementById('arrive-time-input').min = timeString;
 
         //Add a bit which can get the list of stations (obtained from the dictionary file)
         async function loadStations() {
@@ -281,12 +285,12 @@
             }
         }
         //If this is the first request (status == 0) then print as much. If not keep the current results. Not sure what I meant by that now.
-        if (requestStatus == 0){
+        if (requestStatus == 0 || requestStatus == 1){
             document.getElementById("status-container").innerHTML = "Potentially valid request submitted... Hopefully the backend is doing something now.";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
         } else {
-            document.getElementById("status-container").innerHTML = "Finding more tickets (may take a while...)";
+            document.getElementById("status-container").innerHTML = "Finding split tickets (may take a while...)";
         }
         
         //If it's got this far, there are at least origin and destination stations
