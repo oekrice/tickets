@@ -104,18 +104,18 @@ def find_first_splits(request_info, station_checks):
 def filter_splits(request_info, unfiltered_splits):
     #Uses the price matrix approach to filter the splits. Current going to base it on departure time and journey length. Resolution will depend on how long such things take...
     #Actually, this is silly. Let's determine bounds first. Or could just do that based on the request? Yes!
-    x_res = 5/60; y_res  = 5/60
+    res = 5/60
     time_spread = request_info.get("time_spread",10)/60   #Spread times by these in each direction (resolution of not caring)
     t0 = request_info['start_time']
     t1 = request_info['end_time']
     #jtime = abs(t1 - t0).total_seconds()/3600   #Number of hours
-    minx = t0.hour + t0.minute/60 - x_res; maxx = t1.hour + t1.minute/60 + x_res
-    miny = 0; maxy = maxx-minx + y_res
-    nbins_x = int((maxx - minx)/x_res); nbins_y = int((maxy - miny)/y_res)
+    minx = t0.hour + t0.minute/60 - res; maxx = t1.hour + t1.minute/60 + res
+    miny = 0; maxy = maxx-minx + res
+    nbins_x = int((maxx - minx)/res); nbins_y = int((maxy - miny)/res)
     xs = np.linspace(minx, maxx, nbins_x + 1); ys = np.linspace(miny, maxy, nbins_y + 1)
-    x_res = xs[1] - xs[0]; y_res = ys[1] - ys[0]
+    res = xs[1] - xs[0]
     price_matrix = 1e6*np.ones((len(xs), len(ys)))   #Set as unattainably high to begin with, and reduce if necessary
-    spread_bins = int(time_spread/x_res)
+    spread_bins = int(time_spread/res)
 
     local_matrix = price_matrix.copy() 
     minprice = 1e6; maxprice = 0
@@ -136,12 +136,16 @@ def filter_splits(request_info, unfiltered_splits):
             #Update the price matrix here. Don't want loops but might have to have them... Bugger.
             local_matrix[spreadmin:spreadmax+1,ybin] = split["price"]
             local_matrix[spreadmin:spreadmax+1,ybin+1:] = split["price"] - 0.005  #Don't bother with ones which are exactly the same price
+            #Update for journeys which left earlier but took longer (arriving at the same time or later)
+            for c, i in enumerate(range(xbin, -1, -1)):
+                if ybin + c < len(ys):
+                    local_matrix[i,ybin+c:] = split["price"]
             price_matrix = np.minimum(price_matrix, local_matrix)
             local_matrix[:,:] = 1e6
 
     price_matrix[price_matrix > 1e5] = maxprice
 
-    if False:
+    if True:
         plt.xticks(range(0,24))
         plt.yticks(range(0,24))
         plt.pcolormesh(xs, ys, price_matrix.T)
