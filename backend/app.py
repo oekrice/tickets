@@ -61,9 +61,9 @@ def trains():
                             "start_time": depart_time, 
                             "end_time": arrive_time,
                             "ignore_previous": False,
-                            "nchecks_init":20,
+                            "nchecks_init":50,
                             "max_extra_time":125, 
-                            "time_spread":20
+                            "time_spread":10
                             }  
             station_info = find_station_info(request_info)   #This will attempt to rank the stations in the request based on geography, THEN other things like timing and price (which will take a request).
             print('Found stations')
