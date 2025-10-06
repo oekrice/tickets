@@ -53,7 +53,7 @@ def rank_stations(request_info, station_info):
 def find_first_splits(request_info, station_checks):
     nchecks_init = request_info.get("nchecks_init", 20)
     allchecks = station_checks[:nchecks_init]
-    nrequests_max = 10  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
+    nrequests_max = 250  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
     nlumps = int(len(allchecks)/(nrequests_max/2) + 1)
     nrequests_actual = len(allchecks)/nlumps + 1
     individual_journeys = []

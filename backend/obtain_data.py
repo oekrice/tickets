@@ -8,6 +8,9 @@ import json
 from geopy.distance import geodesic
 import numpy as np
 import os
+import asyncio 
+import aiohttp
+
 #This is for obtaining the data
 
 def makeurl_nr(origin, destination, date_search, page_start_time, arr_flag = False):
@@ -39,13 +42,13 @@ def find_basic_info(input_parameters, alljourneys = []):
     overall_start_time = t_start
 
     multithread_cadence = 60  #Cadence in minutes for the remaining hours of the day. This will need playing with a bit to optimise I imagine.
-
     #Establish the required start times here
     if start_only or end_only:  #Partial searches
-        start_times = [t_start]
+        start_times = [t_start]; end_times = [t_end]
     else:  #Full search
         go = True
-        start_times = []
+        start_times = []; end_times = []
+        journeys = []
         start_time = overall_start_time
         while go:
             start_times.append(start_time)
@@ -56,32 +59,50 @@ def find_basic_info(input_parameters, alljourneys = []):
                 if start_time < start_times[-1]:
                     go = False
 
-    def append_to_journeys(local_start, local_end, journeys):
-        go = True
-        pagecount = 0
-        page_start_time = local_start
-        while go:   #cycling through pages as it only gives a few results at a time
-            if origin == destination:
-                return []
-
-            if end_only:
-                url = makeurl_nr(origin, destination, date_search, local_end, arr_flag = True)
+    if len(start_times) > 1:
+        for si, local_start in enumerate(start_times):
+            if si == len(start_times) - 1 or end_only:
+                local_end = t_end
             else:
-                url = makeurl_nr(origin, destination, date_search, page_start_time, arr_flag = False)
-            try:
-                page = requests.get(url)
-            except:
-                print('Internet error, probably. Waiting and trying again...')
-                go = True
-                pagecount = 0
-                time.sleep(10.0)
-                continue
+                local_end = start_times[si + 1]
+            end_times.append(local_end)
+    else:
+        end_times.append(t_end)
 
-            tree = html.fromstring(page.content)
+    async def fetch(session, url):
+        async with session.get(url) as response:
+            return await response.text()
 
-            if str(page) == "<Response [403]>":
+    async def scrape_new(urls):
+        async with aiohttp.ClientSession() as session:
+            tasks = [fetch(session, url) for url in urls]
+            pages = await asyncio.gather(*tasks)
+        return pages
+
+    go = True
+    pagecount = 0
+    stop_flags = np.zeros(len(start_times))   #Set to 1 once an individual has got too far.
+    while go:
+        urls = []
+        for ri in range(len(start_times)):
+            
+            if end_only:
+                url = makeurl_nr(origin, destination, date_search, end_times[ri], arr_flag = True)
+            else:
+                url = makeurl_nr(origin, destination, date_search, start_times[ri], arr_flag = False)
+
+            urls.append(url)
+
+        start_times_current = start_times.copy()
+        start_times = []  #Need to reset and do this each time
+
+        pages = asyncio.run(scrape_new(urls))
+        for pi, page in enumerate(pages):
+            local_end = end_times[pi]
+            tree = html.fromstring(page)
+
+            if len(page) == 118:
                 print('National rail have cottoned on. Waiting a bit and trying again...')
-                go = True
                 pagecount = 0
                 time.sleep(10.0)
                 continue
@@ -89,6 +110,7 @@ def find_basic_info(input_parameters, alljourneys = []):
             dep = tree.xpath('//div[@class="dep"]/text()')
             arr = tree.xpath('//div[@class="arr"]/text()')
             price = tree.xpath('//label[@class="opsingle"]/text()')
+
             if page == '<Response [200]>':
                 journeys = []
 
@@ -103,42 +125,29 @@ def find_basic_info(input_parameters, alljourneys = []):
                     else:
                         p1 = float(price[i*2 + 1].strip()[1:])
                         if not start_only and not end_only:
-                            if dep1 >= local_start and arr1 <= t_end and arr1 > dep1 and arr1 > page_start_time and dep1 <= local_end:
+                            if dep1 >= start_times_current[pi] and arr1 <= t_end and arr1 > dep1 and arr1 > start_times_current[pi] and dep1 <= t_end:
                                 journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1})
                         else:
                             journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1})
-                    if arr1 < page_start_time:
-                        go = False
+                if arr1 < overall_start_time:
+                    stop_flags[pi] = 1.
+                    start_times.append(start_times_current[pi])
                 if arr1 < local_end and arr1 > t_start:
-                    pagecount += 1
                     page_start_time = (dt.combine(date_search, dep1) + timedelta(minutes=1)).time()
+                    start_times.append(page_start_time)
                 else:
-                    go = False
+                    stop_flags[pi] = 1.
+                    start_times.append(start_times_current[pi])
             else:
-                go = False
-            if pagecount > 25:
-                return []
+                stop_flags[pi] = 1.
+                start_times.append(start_times_current[pi])
             if start_only or end_only:
                 go = False
-
-    journeys = []
-    threads = []
-    if len(start_times) > 1:
-        for si, local_start in enumerate(start_times):
-            if si == len(start_times) - 1 or end_only:
-                local_end = t_end
-            else:
-                local_end = start_times[si + 1]
-
-            x = threading.Thread(target=append_to_journeys, args=(local_start, local_end, journeys), daemon = False)
-            threads.append(x)
-            x.start()
-        for j, x in enumerate(threads):
-            x.join()
-
-    else:
-        append_to_journeys(start_times[0], t_end, journeys)
-    #Sort and filter the journeys
+            if np.min(stop_flags) > 0.0:
+                go = False
+        pagecount += 1
+        if pagecount > 10:
+            go = False
 
     unique_journeys = []; seen = set()
     for journey in journeys:

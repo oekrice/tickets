@@ -61,14 +61,14 @@ def trains():
                             "start_time": depart_time, 
                             "end_time": arrive_time,
                             "ignore_previous": False,
-                            "nchecks_init":50,
+                            "nchecks_init":100,
                             "max_extra_time":125, 
                             "time_spread":10
                             }  
             station_info = find_station_info(request_info)   #This will attempt to rank the stations in the request based on geography, THEN other things like timing and price (which will take a request).
             print('Found stations')
             station_checks = rank_stations(request_info, station_info)
-            print('Finding splits...')
+            print('Finding splits, looking at ', len(station_checks), ' stations initially.')
             single_splits_unfiltered = find_first_splits(request_info, station_checks)
             print('Found splits. Filtering them.')
 

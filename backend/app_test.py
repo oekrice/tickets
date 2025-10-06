@@ -19,6 +19,10 @@ request_info = {"origin": origin,
                 "max_extra_time":65
                 }   
 
+
+direct_journeys = find_basic_info(request_info)
+sys.exit()
+
 station_info = find_station_info(request_info)   #This will attempt to rank the stations in the request based on geography, THEN other things like timing and price (which will take a request).
 station_checks = rank_stations(request_info, station_info)   #Need to be smarter with this, and just not check those where the timings are off. Can get a tmin and tmax for each station too, based on this particular request.
 single_splits_unfiltered = find_first_splits(request_info, station_checks)
