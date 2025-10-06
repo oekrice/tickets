@@ -1,10 +1,11 @@
-from obtain_data import find_basic_info
+from obtain_data import find_basic_info, find_station_info
 import threading
 import numpy as np
 from datetime import datetime as dt, timedelta
 from datetime import time
 import matplotlib.pyplot as plt
 import matplotlib
+from pathlib import Path
 matplotlib.use("Agg")
 
 def rank_stations(request_info, station_info):
@@ -50,10 +51,118 @@ def rank_stations(request_info, station_info):
              basic_list.append(bothlist[i][0])
     return final_list
 
+def find_journeys(request_info, splits = []):
+    #This function is for finding journeys GENERALLY. The degree to how in-depth this is is given in request_info
+    #A degree of 0 will just find the NR ones etc., and things can go from there to be more in-depth.
+    #Each set of requests will check both those at this level and that BELOW (if appropriate). Thus can very much be circular.
+    #Requires station checks to be done here or things will get lost...
+    print('Request logged', request_info)
+    #If request info is greater than 0, need to do station checks
+    if request_info["request_depth"] > 0:
+        #Need to do additional admin if there's more to it than a basic check
+        station_info = find_station_info(request_info)   #This will attempt to rank the stations in the request based on geography, THEN other things like timing and price (which will take a request).
+        station_checks = rank_stations(request_info, station_info)   #Need to be smarter with this, and just not check those where the timings are off. Can get a tmin and tmax for each station too, based on this particular request.
+        nchecks_init = request_info.get("nchecks_init", 20)
+        allchecks = station_checks[:nchecks_init]
+        nrequests_max = 100  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
+        nlumps = int(len(allchecks)/(nrequests_max/2) + 1)
+        nrequests_actual = len(allchecks)/nlumps + 1
+        individual_journeys = []
+
+        for lump in range(nlumps):
+            threads = []; lumpcount = 0
+            minstat = int(nrequests_actual*lump); maxstat = int(min(nrequests_actual*(lump+1), len(allchecks)))
+
+            if lump == 0:
+                #Do the basic check on direct journeys at the degree below this one
+                input_parameters = request_info.copy()   #All timing stuff is the same to begin with.
+                input_parameters["request_depth"] = input_parameters["request_depth"] - 1
+                x = threading.Thread(target=find_journeys, args=(input_parameters, individual_journeys), daemon = False)
+                threads.append(x)
+                x.start()
+
+            for station in allchecks[minstat:maxstat]:  #Alas this bit needs some multithreading, as it's far too slow.
+                #Let's do a basic search and see how long it takes. Do first section and second section separately. Hopefully not too long for a reasonably small list.
+                input_parameters_first = request_info.copy()   #All timing stuff is the same to begin with.
+                input_parameters_first["request_depth"] = input_parameters_first["request_depth"] - 1
+                input_parameters_first["destination"] = station[0]
+                input_parameters_first["end_time"] = time(hour = int((station[2] + 5)//60), minute = int((station[2] + 5)%60))
+
+                input_parameters_second = request_info.copy()   #All timing stuff is the same to begin with.
+                input_parameters_second["request_depth"] = input_parameters_second["request_depth"] - 1
+                input_parameters_second["origin"] = station[0]
+                input_parameters_second["start_time"] = time(hour = int((station[1] - 5)//60), minute = int((station[1] - 5)%60))
+
+                print(station, input_parameters_second["start_time"], input_parameters_first["end_time"])
+                x = threading.Thread(target=find_journeys, args=(input_parameters_first, individual_journeys), daemon = False)
+                threads.append(x)
+                x.start()
+
+                x = threading.Thread(target=find_journeys, args=(input_parameters_second, individual_journeys), daemon = False)
+                threads.append(x)
+                x.start()
+
+            for j, x in enumerate(threads):
+                x.join()
+
+            print('%d percent of stations checked...' % (100*maxstat/len(allchecks)))
+
+        alljourneys = []; id_count = 0
+        #Once these have all completed, save into a nice ordered list and check for reasonable combinations
+        for journey_group in individual_journeys:
+            for journey in journey_group:
+                alljourneys.append(journey)
+                alljourneys[-1]["id"] = id_count
+                id_count += 1
+
+        allsplits = []
+        #Find combinations of these which work.
+        print('All trains found. Finding valid combinations.')
+        for i1, j1 in enumerate(alljourneys):
+            for i2, j2 in enumerate(alljourneys):
+                if j1["destination"] == j2["origin"] and float(j1["arr_time"]) <= float(j2["dep_time"]):
+                    #This is valid. Combine into a single journey object.
+                    #Determine existing split stations here
+                    allsplits.append({
+                        'origin':j1['origin'], 'destination': j2['destination'],
+                        'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
+                        'price':j1['price'] + j2['price'],
+                        'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
+                        'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
+                        'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"]
+                    })
+            if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid nourney without anything else
+                    allsplits.append({
+                        'origin':j1['origin'], 'destination': j1['destination'],
+                        'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
+                        'price':j1['price'],
+                        'split_stations':j1['split_stations'],
+                        'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps']
+                    })
+
+        splits.append(filter_splits(request_info, allsplits))
+
+        return splits
+    else:
+        individual_journeys = []
+        find_basic_info(request_info, alljourneys = individual_journeys)
+        id_count = 0
+        alljourneys = []
+        #Once these have all completed, save into a nice ordered list and check for reasonable combinations
+        for journey_group in individual_journeys:
+            for journey in journey_group:
+                alljourneys.append(journey)
+
+        splits.append(filter_splits(request_info, alljourneys))
+
+        return splits
+
 def find_first_splits(request_info, station_checks):
+    #The degree to which this goes in-depth depends entirely on the request info. Should be quite general ideally, but that's very tricky.
+
     nchecks_init = request_info.get("nchecks_init", 20)
     allchecks = station_checks[:nchecks_init]
-    nrequests_max = 250  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
+    nrequests_max = 100  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
     nlumps = int(len(allchecks)/(nrequests_max/2) + 1)
     nrequests_actual = len(allchecks)/nlumps + 1
     individual_journeys = []
@@ -106,27 +215,33 @@ def find_first_splits(request_info, station_checks):
         for i2, j2 in enumerate(alljourneys):
             if j1["destination"] == j2["origin"] and float(j1["arr_time"]) <= float(j2["dep_time"]):
                 #This is valid. Combine into a single journey object.
+                #Determine existing split stations here
                 splits.append({
                     'origin':j1['origin'], 'destination': j2['destination'], 
                     'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
                     'price':j1['price'] + j2['price'],
-                    'split_stations':[j1["destination"]],
-                    'split_arrs':[j1["arr_time"]], 'split_deps':[j2["dep_time"]]
+                    'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
+                    'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
+                    'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"]
                 })
-        if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:
+        if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid nourney without anything else
                 splits.append({
                     'origin':j1['origin'], 'destination': j1['destination'], 
                     'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
                     'price':j1['price'],
-                    'split_stations':[],
-                    'split_arrs':[], 'split_deps':[]
+                    'split_stations':j1['split_stations'],
+                    'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps']
                 })
-     #Add on direct journeys? Would be better to do that initially in the multithreading...      
+
+     #Add on direct journeys? Would be better to do that initially in the multithreading...  I think it's fine.
+
     return splits
 
 def filter_splits(request_info, unfiltered_splits):
     #Uses the price matrix approach to filter the splits. Current going to base it on departure time and journey length. Resolution will depend on how long such things take...
     #Actually, this is silly. Let's determine bounds first. Or could just do that based on the request? Yes!
+    Path("plots").mkdir(parents=True, exist_ok=True)
+
     res = 1/60
     time_spread = request_info.get("time_spread",10)/60   #Spread times by these in each direction (resolution of not caring)
     t0 = request_info['start_time']
@@ -191,7 +306,7 @@ def filter_splits(request_info, unfiltered_splits):
             xmin = min(xmin, t0.hour  + t0.minute/60); xmax = max(xmax, t0.hour  + t0.minute/60)
             ymin = min(ymin, jtime); ymax = max(ymax, jtime)
     price_matrix[price_matrix > 1e5] = maxprice
-    if True:
+    if False:
         plt.xticks(range(0,24))
         plt.yticks(range(0,24))
         plt.xlim(xmin,xmax)

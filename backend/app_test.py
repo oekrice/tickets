@@ -1,6 +1,6 @@
 #Test for basic functions
 from obtain_data import find_basic_info, find_station_info
-from data_functions import rank_stations, find_first_splits, filter_splits
+from data_functions import rank_stations, find_first_splits, filter_splits, find_journeys
 from datetime import datetime as dt, timedelta
 import datetime
 import json, sys
@@ -8,24 +8,32 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("Agg")
 
-origin = "NCL"; destination = "YRK"
+origin = "NCL"; destination = "LDS"
 request_info = {"origin": origin, 
                 "destination": destination, 
                 "start_time": datetime.time(9,0), 
                 "date": dt.today() + timedelta(days = 1), 
-                "end_time": datetime.time(18,0),
+                "end_time": datetime.time(13,0),
                 "ignore_previous": False,
-                "nchecks_init":10,
-                "max_extra_time":65
+                "nchecks_init":5,
+                "max_extra_time":65,
+                "request_depth":3
                 }   
 
-
-direct_journeys = find_basic_info(request_info)
+journeys = []
+find_journeys(request_info, journeys)
+print(len(journeys[0]))
+print(journeys)
 sys.exit()
 
+direct_journeys = find_basic_info(request_info)
 station_info = find_station_info(request_info)   #This will attempt to rank the stations in the request based on geography, THEN other things like timing and price (which will take a request).
 station_checks = rank_stations(request_info, station_info)   #Need to be smarter with this, and just not check those where the timings are off. Can get a tmin and tmax for each station too, based on this particular request.
 single_splits_unfiltered = find_first_splits(request_info, station_checks)
+
+for journey in single_splits_unfiltered:
+    print(journey['split_stations'],journey['split_arrs'],journey['split_deps'] )
+sys.exit()
 # print('Filtering...')
 # with open('test1.json', "w") as f:
 #     json.dump(single_splits_unfiltered, f)

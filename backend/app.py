@@ -8,7 +8,12 @@ import time
 from obtain_data import find_basic_info, find_station_info
 from data_functions import rank_stations, find_first_splits, filter_splits
 from datetime import datetime as dt, timedelta
+from pathlib import Path
 import datetime
+
+#sys.path.append("/extra/tmp/vgjn10/python/")
+
+#source ../.venv/bin/activate.csh
 
 app = Flask(__name__)
 CORS(app)

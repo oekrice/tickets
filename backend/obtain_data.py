@@ -7,10 +7,11 @@ import threading
 import json
 from geopy.distance import geodesic
 import numpy as np
-import os
+import os, sys
+from pathlib import Path
 import asyncio 
 import aiohttp
-
+import random
 #This is for obtaining the data
 
 def makeurl_nr(origin, destination, date_search, page_start_time, arr_flag = False):
@@ -27,6 +28,13 @@ def find_basic_info(input_parameters, alljourneys = []):
     This function will take the input parameters and scrape the national rail website for the required information.
     Currently only contains start and end, and I'll need to do something with the dates to make them nice
     '''
+
+    USER_AGENTS = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/130.0",
+    ]
+
     journeys = []   #to be appended to, eventually
     date_search = input_parameters.get("date",dt.today())
     t_start = input_parameters.get("start_time",dt.now().time())
@@ -41,7 +49,7 @@ def find_basic_info(input_parameters, alljourneys = []):
 
     overall_start_time = t_start
 
-    multithread_cadence = 60  #Cadence in minutes for the remaining hours of the day. This will need playing with a bit to optimise I imagine.
+    multithread_cadence = 15  #Cadence in minutes for the remaining hours of the day. This will need playing with a bit to optimise I imagine. 60 minutes seems fine
     #Establish the required start times here
     if start_only or end_only:  #Partial searches
         start_times = [t_start]; end_times = [t_end]
@@ -69,20 +77,33 @@ def find_basic_info(input_parameters, alljourneys = []):
     else:
         end_times.append(t_end)
 
-    async def fetch(session, url):
-        async with session.get(url) as response:
-            return await response.text()
+    async def fetch(sem, session, url):
+        await asyncio.sleep(random.uniform(0.1, 0.2))
+        headers = {
+            "User-Agent": random.choice(USER_AGENTS),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
+        }
+        async with sem:
+            async with session.get(url, headers=headers) as response:
+                return await response.text()
 
     async def scrape_new(urls):
+        sem = asyncio.Semaphore(50)
         async with aiohttp.ClientSession() as session:
-            tasks = [fetch(session, url) for url in urls]
+            tasks = [fetch(sem, session, url) for url in urls]
             pages = await asyncio.gather(*tasks)
         return pages
 
     go = True
-    pagecount = 0
+    startcount = 0
     stop_flags = np.zeros(len(start_times))   #Set to 1 once an individual has got too far.
+    wait_time = 1.0
+
+
     while go:
+        #The main loop for generating urls. Hopefully not that long.
         urls = []
         for ri in range(len(start_times)):
             
@@ -97,58 +118,77 @@ def find_basic_info(input_parameters, alljourneys = []):
         start_times = []  #Need to reset and do this each time
 
         pages = asyncio.run(scrape_new(urls))
+        pi = 0
+        success = True
         for pi, page in enumerate(pages):
+            page = pages[pi]
             local_end = end_times[pi]
             tree = html.fromstring(page)
 
             if len(page) == 118:
-                print('National rail have cottoned on. Waiting a bit and trying again...')
-                pagecount = 0
-                time.sleep(10.0)
-                continue
+                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Not very easy.')
+                time.sleep(wait_time)
+                wait_time = min(60, wait_time*2)
+                success = False
+                break #Don't carry on with these pages, try again with the same data
 
-            dep = tree.xpath('//div[@class="dep"]/text()')
-            arr = tree.xpath('//div[@class="arr"]/text()')
-            price = tree.xpath('//label[@class="opsingle"]/text()')
-
-            if page == '<Response [200]>':
-                journeys = []
-
-            if len(dep) > 0 and len(price) == len(dep)*2:
-                #Check the number of priaces matches the number of departures/arrivals
-                for i in range(len(dep)):
-                    dep1 = dt.strptime(dep[i].strip(), "%H:%M").time()
-                    arr1 = dt.strptime(arr[i].strip(), "%H:%M").time()
-                    #Sometimes no fares are available for various reasons. Just don't list these
-                    if len(price[i*2+1].strip()) == 0:
-                        pass
-                    else:
-                        p1 = float(price[i*2 + 1].strip()[1:])
-                        if not start_only and not end_only:
-                            if dep1 >= start_times_current[pi] and arr1 <= t_end and arr1 > dep1 and arr1 > start_times_current[pi] and dep1 <= t_end:
-                                journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1})
-                        else:
-                            journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1})
-                if arr1 < overall_start_time:
-                    stop_flags[pi] = 1.
-                    start_times.append(start_times_current[pi])
-                if arr1 < local_end and arr1 > t_start:
-                    page_start_time = (dt.combine(date_search, dep1) + timedelta(minutes=1)).time()
-                    start_times.append(page_start_time)
-                else:
-                    stop_flags[pi] = 1.
-                    start_times.append(start_times_current[pi])
             else:
-                stop_flags[pi] = 1.
-                start_times.append(start_times_current[pi])
-            if start_only or end_only:
-                go = False
-            if np.min(stop_flags) > 0.0:
-                go = False
-        pagecount += 1
-        if pagecount > 10:
-            go = False
+                #Don't need to back off, just go for it as is.'
+                wait_time = 1.0
 
+                dep = tree.xpath('//div[@class="dep"]/text()')
+                arr = tree.xpath('//div[@class="arr"]/text()')
+                price = tree.xpath('//label[@class="opsingle"]/text()')
+
+                if stop_flags[pi] == 0:  #Don't bother if it's already there...
+                    if len(dep) > 0 and len(price) == len(dep)*2:
+                        #Check the number of priaces matches the number of departures/arrivals
+                        maxdep = dt.strptime("00:01", "%H:%M").time()
+                        maxarr = dt.strptime("00:01", "%H:%M").time()
+                        for i in range(len(dep)):
+                            dep1 = dt.strptime(dep[i].strip(), "%H:%M").time()
+                            arr1 = dt.strptime(arr[i].strip(), "%H:%M").time()
+                            maxdep = max(maxdep, dep1)  #This seems fine!
+                            maxarr = max(maxarr, arr1)
+                            #Sometimes no fares are available for various reasons. Just don't list these
+                            if len(price[i*2+1].strip()) == 0:
+                                pass
+                            else:
+                                p1 = float(price[i*2 + 1].strip()[1:])
+                                if not start_only and not end_only:
+                                    if dep1 >= start_times_current[pi] and arr1 <= t_end and arr1 > dep1 and arr1 > start_times_current[pi] and dep1 <= t_end:
+                                        journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1, 'split_stations':[], 'split_arrs':[], 'split_deps':[]})
+                                else:
+                                    journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1,      'split_stations':[], 'split_arrs':[], 'split_deps':[]})
+                        #Check for reasons to stop -- if search has gone into tomorrow or exceeded the local end
+                        proceed = True  #Proceed unless there's reason not to...
+                        if arr1 < overall_start_time or dep1 > local_end or maxarr > t_end:
+                            proceed = False
+
+                        #Also check for 'lapping' -- going to the next day at any point. Don't allow these...
+                        if arr1 < dep1:
+                            proceed = False
+
+                        if proceed:
+                            page_start_time = (dt.combine(date_search, maxdep) + timedelta(minutes=0)).time()
+                            start_times.append(page_start_time)
+                        else:
+                            stop_flags[pi] = 1.
+                            start_times.append(start_times_current[pi])
+
+                    else:
+                        stop_flags[pi] = 1.
+                        start_times.append(start_times_current[pi])
+
+                if start_only or end_only:
+                    go = False
+                if np.min(stop_flags) > 0.0:
+                    go = False
+
+        if success:
+            startcount += 1
+
+    #print('Waves of requests:', startcount)
     unique_journeys = []; seen = set()
     for journey in journeys:
         # Create a tuple representing the unique identity of each entry
@@ -159,6 +199,10 @@ def find_basic_info(input_parameters, alljourneys = []):
     unique_journeys = sorted(unique_journeys, key=lambda journey: int(journey['dep_time']))
 
     alljourneys.append(unique_journeys)
+
+    # print(len(unique_journeys))
+    # for journey in unique_journeys:
+    #     print(journey["dep_time"])
     return unique_journeys
 
 def find_station_info(request_info):
@@ -168,6 +212,8 @@ def find_station_info(request_info):
     filename = "./station_data/%s_%s.json" % (origin, destination)
     ignore_previous = request_info.get("ignore_previous",False)
 
+    #Create folder if necessary
+    Path("station_data").mkdir(parents=True, exist_ok=True)
     #Initially check if a file for this combination already exists, and if so use that
     if os.path.exists(filename) and not ignore_previous:
         try:
