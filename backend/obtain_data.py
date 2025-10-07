@@ -29,6 +29,7 @@ def find_basic_info(input_parameters, alljourneys = []):
     Currently only contains start and end, and I'll need to do something with the dates to make them nice
     '''
 
+    #print('Nesting', input_parameters["nesting_degree"])
     USER_AGENTS = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
@@ -78,7 +79,7 @@ def find_basic_info(input_parameters, alljourneys = []):
         end_times.append(t_end)
 
     async def fetch(sem, session, url):
-        await asyncio.sleep(random.uniform(0.1, 0.2))
+        await asyncio.sleep(random.uniform(0.1, 1.0))
         headers = {
             "User-Agent": random.choice(USER_AGENTS),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -90,8 +91,9 @@ def find_basic_info(input_parameters, alljourneys = []):
                 return await response.text()
 
     async def scrape_new(urls):
-        sem = asyncio.Semaphore(50)
-        async with aiohttp.ClientSession() as session:
+        sem = asyncio.Semaphore(10)
+        connector = aiohttp.TCPConnector(limit=10)
+        async with aiohttp.ClientSession(connector = connector) as session:
             tasks = [fetch(sem, session, url) for url in urls]
             pages = await asyncio.gather(*tasks)
         return pages
@@ -99,7 +101,7 @@ def find_basic_info(input_parameters, alljourneys = []):
     go = True
     startcount = 0
     stop_flags = np.zeros(len(start_times))   #Set to 1 once an individual has got too far.
-    wait_time = 1.0
+    wait_time = 15.0
 
 
     while go:
@@ -126,15 +128,16 @@ def find_basic_info(input_parameters, alljourneys = []):
             tree = html.fromstring(page)
 
             if len(page) == 118:
-                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Not very easy.')
+                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for', wait_time, 'seconds.')
                 time.sleep(wait_time)
                 wait_time = min(60, wait_time*2)
                 success = False
+                start_times = start_times_current.copy()
                 break #Don't carry on with these pages, try again with the same data
 
             else:
                 #Don't need to back off, just go for it as is.'
-                wait_time = 1.0
+                wait_time = 15.0
 
                 dep = tree.xpath('//div[@class="dep"]/text()')
                 arr = tree.xpath('//div[@class="arr"]/text()')
@@ -211,7 +214,7 @@ def find_station_info(request_info):
     destination = request_info['destination']
     filename = "./station_data/%s_%s.json" % (origin, destination)
     ignore_previous = request_info.get("ignore_previous",False)
-
+    nesting_degree = request_info.get("nesting_degree", 0)
     #Create folder if necessary
     Path("station_data").mkdir(parents=True, exist_ok=True)
     #Initially check if a file for this combination already exists, and if so use that
@@ -246,7 +249,10 @@ def find_station_info(request_info):
 
     alljourneys = []
     #Separate this out into lumps
-    nrequests_max = 100
+    if nesting_degree == 0:
+        nrequests_max = 100
+    else:
+        nrequests_max = 10
     nlumps = int(len(station_list)/(nrequests_max/2) + 1)
     nrequests_actual = len(station_list)/nlumps + 1
     modified_request_info = request_info.copy()
@@ -311,7 +317,7 @@ def find_station_info(request_info):
             price2 = np.abs(station_data[station]['price2']/(1.0 - station_data[station]['progress']))
             price_score = min(price1, price2)
             final_station_data[station] = {"time_score":time_score, "price_score":price_score, "in_time":station_data[station]['time1'], "out_time":station_data[station]['time2']}
-        elif station == destination:
+        elif station == destination and 'time1' in station_data[station]:
             #This is the whole journey (not the splits), which contains useful information so may as well put it in. Also useful for normalising the prices, which I'll do shortly.
             time_score = station_data[station]['time1'] - reftime
             price_score = np.abs(station_data[station]['price1'])

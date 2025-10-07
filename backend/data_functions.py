@@ -17,6 +17,7 @@ def rank_stations(request_info, station_info):
 
     #Determine maximum time for this connection
     extra_time = request_info.get("max_extra_time",125)
+    nesting_degree = request_info.get("nesting_degree",0)
     t0 = request_info['start_time'].hour*60 + request_info['start_time'].minute
     t1 = request_info['end_time'].hour*60 + request_info['end_time'].minute
     max_time = t1 - t0
@@ -42,6 +43,7 @@ def rank_stations(request_info, station_info):
 
     final_list = []
     basic_list = []
+
     #Remove duplicates
     for i in range(len(bothlist)):
          if bothlist[i][0] not in basic_list:
@@ -56,56 +58,73 @@ def find_journeys(request_info, splits = []):
     #A degree of 0 will just find the NR ones etc., and things can go from there to be more in-depth.
     #Each set of requests will check both those at this level and that BELOW (if appropriate). Thus can very much be circular.
     #Requires station checks to be done here or things will get lost...
-    print('Request logged', request_info)
+    #print('Request logged', request_info)
     #If request info is greater than 0, need to do station checks
+    nesting_degree = request_info.get("nesting_degree", 0)
     if request_info["request_depth"] > 0:
         #Need to do additional admin if there's more to it than a basic check
         station_info = find_station_info(request_info)   #This will attempt to rank the stations in the request based on geography, THEN other things like timing and price (which will take a request).
         station_checks = rank_stations(request_info, station_info)   #Need to be smarter with this, and just not check those where the timings are off. Can get a tmin and tmax for each station too, based on this particular request.
         nchecks_init = request_info.get("nchecks_init", 20)
+        print(request_info["request_depth"], nesting_degree)
+        if nesting_degree > 0:
+            nrequests_max = 2  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
+            nchecks_init = int(nchecks_init//10) + 1 #Seems reasonable for extreme checks
+        elif request_info["request_depth"] == 1 and nesting_degree == 0:
+            nrequests_max = 50
+        else:
+            nrequests_max = 20
+
         allchecks = station_checks[:nchecks_init]
-        nrequests_max = 100  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
-        nlumps = int(len(allchecks)/(nrequests_max/2) + 1)
-        nrequests_actual = len(allchecks)/nlumps + 1
+
+        print('Checking ', nchecks_init, ' stations between', request_info["origin"], 'and', request_info["destination"] )
         individual_journeys = []
 
-        for lump in range(nlumps):
-            threads = []; lumpcount = 0
-            minstat = int(nrequests_actual*lump); maxstat = int(min(nrequests_actual*(lump+1), len(allchecks)))
+        if len(allchecks) > 0:
+            nlumps = int(len(allchecks)/(nrequests_max/2) + 1)
+            nrequests_actual = len(allchecks)/nlumps + 1
 
-            if lump == 0:
-                #Do the basic check on direct journeys at the degree below this one
-                input_parameters = request_info.copy()   #All timing stuff is the same to begin with.
-                input_parameters["request_depth"] = input_parameters["request_depth"] - 1
-                x = threading.Thread(target=find_journeys, args=(input_parameters, individual_journeys), daemon = False)
-                threads.append(x)
-                x.start()
+            for lump in range(nlumps):
+                threads = []; lumpcount = 0
+                minstat = int(nrequests_actual*lump); maxstat = int(min(nrequests_actual*(lump+1), len(allchecks)))
 
-            for station in allchecks[minstat:maxstat]:  #Alas this bit needs some multithreading, as it's far too slow.
-                #Let's do a basic search and see how long it takes. Do first section and second section separately. Hopefully not too long for a reasonably small list.
-                input_parameters_first = request_info.copy()   #All timing stuff is the same to begin with.
-                input_parameters_first["request_depth"] = input_parameters_first["request_depth"] - 1
-                input_parameters_first["destination"] = station[0]
-                input_parameters_first["end_time"] = time(hour = int((station[2] + 5)//60), minute = int((station[2] + 5)%60))
+                if lump == 0:
+                    #Do the basic check on direct journeys at the degree below this one
+                    input_parameters = request_info.copy()   #All timing stuff is the same to begin with.
+                    input_parameters["request_depth"] = input_parameters["request_depth"] - 1
+                    input_parameters["nesting_degree"] = nesting_degree + 1
+                    x = threading.Thread(target=find_journeys, args=(input_parameters, individual_journeys), daemon = False)
+                    threads.append(x)
+                    x.start()
 
-                input_parameters_second = request_info.copy()   #All timing stuff is the same to begin with.
-                input_parameters_second["request_depth"] = input_parameters_second["request_depth"] - 1
-                input_parameters_second["origin"] = station[0]
-                input_parameters_second["start_time"] = time(hour = int((station[1] - 5)//60), minute = int((station[1] - 5)%60))
+                for station in allchecks[minstat:maxstat]:  #Alas this bit needs some multithreading, as it's far too slow.
+                    #Let's do a basic search and see how long it takes. Do first section and second section separately. Hopefully not too long for a reasonably small list.
+                    input_parameters_first = request_info.copy()   #All timing stuff is the same to begin with.
+                    input_parameters_first["request_depth"] = input_parameters_first["request_depth"] - 1
+                    input_parameters_first["nesting_degree"] = nesting_degree + 1
+                    input_parameters_first["destination"] = station[0]
+                    input_parameters_first["end_time"] = time(hour = int((station[2] + 5)//60), minute = int((station[2] + 5)%60))
 
-                print(station, input_parameters_second["start_time"], input_parameters_first["end_time"])
-                x = threading.Thread(target=find_journeys, args=(input_parameters_first, individual_journeys), daemon = False)
-                threads.append(x)
-                x.start()
+                    input_parameters_second = request_info.copy()   #All timing stuff is the same to begin with.
+                    input_parameters_second["request_depth"] = input_parameters_second["request_depth"] - 1
+                    input_parameters_second["nesting_degree"] = nesting_degree + 1
 
-                x = threading.Thread(target=find_journeys, args=(input_parameters_second, individual_journeys), daemon = False)
-                threads.append(x)
-                x.start()
+                    input_parameters_second["origin"] = station[0]
+                    input_parameters_second["start_time"] = time(hour = int((station[1] - 5)//60), minute = int((station[1] - 5)%60))
 
-            for j, x in enumerate(threads):
-                x.join()
+                    print(station, input_parameters_second["start_time"], input_parameters_first["end_time"])
+                    x = threading.Thread(target=find_journeys, args=(input_parameters_first, individual_journeys), daemon = False)
+                    threads.append(x)
+                    x.start()
 
-            print('%d percent of stations checked...' % (100*maxstat/len(allchecks)))
+                    x = threading.Thread(target=find_journeys, args=(input_parameters_second, individual_journeys), daemon = False)
+                    threads.append(x)
+                    x.start()
+
+                for j, x in enumerate(threads):
+                    x.join()
+
+                print('%d percent of stations checked...' % (100*maxstat/len(allchecks)))
 
         alljourneys = []; id_count = 0
         #Once these have all completed, save into a nice ordered list and check for reasonable combinations
@@ -117,7 +136,6 @@ def find_journeys(request_info, splits = []):
 
         allsplits = []
         #Find combinations of these which work.
-        print('All trains found. Finding valid combinations.')
         for i1, j1 in enumerate(alljourneys):
             for i2, j2 in enumerate(alljourneys):
                 if j1["destination"] == j2["origin"] and float(j1["arr_time"]) <= float(j2["dep_time"]):
@@ -141,10 +159,12 @@ def find_journeys(request_info, splits = []):
                     })
 
         splits.append(filter_splits(request_info, allsplits))
+        print(len(splits[0]), ' single splits found between', request_info["origin"], 'and', request_info["destination"])
 
         return splits
     else:
         individual_journeys = []
+        request_info["nesting_degree"] = nesting_degree
         find_basic_info(request_info, alljourneys = individual_journeys)
         id_count = 0
         alljourneys = []

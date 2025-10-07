@@ -8,22 +8,22 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("Agg")
 
-origin = "NCL"; destination = "LDS"
+#source ../.venv/bin/activate.csh
+
+origin = "NCL"; destination = "YRK"
 request_info = {"origin": origin, 
                 "destination": destination, 
                 "start_time": datetime.time(9,0), 
                 "date": dt.today() + timedelta(days = 1), 
                 "end_time": datetime.time(13,0),
                 "ignore_previous": False,
-                "nchecks_init":5,
+                "nchecks_init":10,
                 "max_extra_time":65,
-                "request_depth":3
+                "request_depth":2
                 }   
 
 journeys = []
 find_journeys(request_info, journeys)
-print(len(journeys[0]))
-print(journeys)
 sys.exit()
 
 direct_journeys = find_basic_info(request_info)
