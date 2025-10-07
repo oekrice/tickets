@@ -1,7 +1,7 @@
 
 table {
   border-collapse: collapse;
-  width: 100%;
+  width: 180px;
 }
 
 th, td {
@@ -9,7 +9,17 @@ th, td {
   padding: 8px;
 }
 
-tr:nth-child(even) {
+
+tr.details {
+    display:none;
+     background-color: #33cfff;
+    border-collapse: collapse;
+    border-style: solid;
+    border-width: thin
+}
+
+
+tr:nth-child(4n-2) {
   background-color: #ffe15b;
 }
 

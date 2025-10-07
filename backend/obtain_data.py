@@ -160,9 +160,9 @@ def find_basic_info(input_parameters, alljourneys = []):
                                 p1 = float(price[i*2 + 1].strip()[1:])
                                 if not start_only and not end_only:
                                     if dep1 >= start_times_current[pi] and arr1 <= t_end and arr1 > dep1 and arr1 > start_times_current[pi] and dep1 <= t_end:
-                                        journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1, 'split_stations':[], 'split_arrs':[], 'split_deps':[]})
+                                        journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1, 'split_stations':[], 'split_arrs':[], 'split_deps':[], 'split_prices':[p1]})
                                 else:
-                                    journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1,      'split_stations':[], 'split_arrs':[], 'split_deps':[]})
+                                    journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1,      'split_stations':[], 'split_arrs':[], 'split_deps':[],'split_prices':[p1]})
                         #Check for reasons to stop -- if search has gone into tomorrow or exceeded the local end
                         proceed = True  #Proceed unless there's reason not to...
                         if arr1 < overall_start_time or dep1 > local_end or maxarr > t_end:

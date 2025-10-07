@@ -68,7 +68,7 @@ def trains():
                             "start_time": depart_time,
                             "end_time": arrive_time,
                             "ignore_previous": False,
-                            "nchecks_init":100,
+                            "nchecks_init":10,
                             "max_extra_time":65,
                             "time_spread":10,
                             "request_depth":1

@@ -41,12 +41,12 @@
     <hr>
     <div id="status-container"></div>
     <div id="result-container"></div>
-    <table id="outputTable" style="display:none">
+    <table id="outputTable" style="display:none" >
         <tr>
             <th>Departs</th>
             <th>Arrives</th>
             <th>Price</th>
-            <th>Journey Time</th>
+            <th>Time</th>
         </tr>
     </table>
 
@@ -98,7 +98,7 @@
                 if (trainData.length == 0) {
                     resultInfo = "No trains found."
                 } else {
-                    resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ":"
+                    resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click on them for more info."
                     document.getElementById("outputTable").style.display = "block";
                 }
                 document.getElementById("status-container").innerHTML = resultInfo;
@@ -210,28 +210,72 @@
         for (let i = 0; i < trainData.length; i ++){
             newRow = outputTable.insertRow(-1);
 
-            newCell = newRow.insertCell(0);
+            newCell = newRow.insertCell();
             newText = document.createTextNode(toTime(trainData[i].dep_time));           
             newCell.appendChild(newText);
 
-            newCell = newRow.insertCell(1);
+            newCell = newRow.insertCell();
             newText = document.createTextNode(toTime(trainData[i].arr_time));
             newCell.appendChild(newText);
           
-            newCell = newRow.insertCell(2);
+            newCell = newRow.insertCell();
             newText = document.createTextNode(toPrice(trainData[i].price));
             newCell.appendChild(newText);
 
             //Calculate the journey time here, as that's a useful thing to have
             journeyTime = findJourneyTime(trainData[i].dep_time, trainData[i].arr_time)
-            newCell = newRow.insertCell(3);
+            newCell = newRow.insertCell();
             if (journeyTime.getUTCHours() < 1){
                 newText = document.createTextNode(journeyTime.getUTCMinutes() + "m");
             } else {
                 newText = document.createTextNode(journeyTime.getUTCHours() + "h" + journeyTime.getUTCMinutes());
             }
             newCell.appendChild(newText);
+
+            newRow.classList.add('clickable');
+
+            let detailsRow = outputTable.insertRow();
+            detailsRow.classList.add('details');
+            let cell = detailsRow.insertCell();
+
+            cell.colSpan = 4;
+            cell.innerHTML = trainAdditionalInfo(i)
+
+            newRow.addEventListener('click', () => {
+                detailsRow.style.display =
+                detailsRow.style.display === 'table-row' ? 'none' : 'table-row';
+            });
+
+            detailsRow.addEventListener('click', () => {
+                detailsRow.style.display =
+                detailsRow.style.display === 'table-row' ? 'none' : 'table-row';
+            });
         }
+    }
+
+    function trainAdditionalInfo(trainNumber){
+        //Returns the additional info for the train in nicely formatted html
+        //Number of tickets and things. Might need a station lookup?
+        let returnString = '<div>'
+        let rowString = ''  //For each row. This is a bit tricky to format probably
+        const nsplits = trainData[trainNumber].split_stations.length
+
+        if (nsplits == 0) {
+            returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp£' + trainData[trainNumber].split_prices[0].toFixed(2)
+        } else {
+            returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].split_stations[0] + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].split_arrs[0]) + '&nbsp&nbsp£' + trainData[trainNumber].split_prices[0].toFixed(2)
+            returnString += '<br>'
+            //Then middle splits (if any). Not sure how to test this very well...
+            for (let i = 0; i < nsplits - 1; i++){
+            returnString += trainData[trainNumber].split_stations[i]+ '-' + trainData[trainNumber].split_stations[i+1] + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[i]) + '-' + toTime(trainData[trainNumber].split_arrs[i]) + '&nbsp&nbsp£' + trainData[trainNumber].split_prices[i+1].toFixed(2)
+            returnString += '<br>'
+            }
+            returnString += trainData[trainNumber].split_stations[nsplits-1] + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[nsplits-1]) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp£' + trainData[trainNumber].split_prices[nsplits].toFixed(2)
+        }
+
+        returnString += '</div>'
+
+        return returnString
     }
 
     function packageInputData(requestStatus){

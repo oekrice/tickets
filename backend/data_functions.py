@@ -149,15 +149,17 @@ def find_journeys(request_info, splits = []):
                         'price':j1['price'] + j2['price'],
                         'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
                         'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
-                        'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"]
+                        'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
+                        'split_prices':j1["split_prices"] + j2["split_prices"]
                     })
-            if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid nourney without anything else
+            if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
                     allsplits.append({
                         'origin':j1['origin'], 'destination': j1['destination'],
                         'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
                         'price':j1['price'],
                         'split_stations':j1['split_stations'],
-                        'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps']
+                        'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
+                        'split_prices':j1["split_prices"]
                     })
 
         #print(len(allsplits),' unfiltered splits found between', request_info["origin"], 'and', request_info["destination"])
