@@ -35,7 +35,9 @@
 
     <hr>
     <div>
-        <button onclick=getTrains(0)>Get basic train data</button><button onclick=getTrains(1)>Get split ticket data</button>
+        <button onclick=getTrains(0)>Get basic train data</button>
+        <button onclick=getTrains(1)>Get split ticket data</button>
+        <button onclick=getTrains(2)>Get very split ticket data</button>
     <hr>
     <div id="status-container"></div>
     <div id="result-container"></div>
@@ -285,12 +287,18 @@
             }
         }
         //If this is the first request (status == 0) then print as much. If not keep the current results. Not sure what I meant by that now.
-        if (requestStatus == 0 || requestStatus == 1){
-            document.getElementById("status-container").innerHTML = "Potentially valid request submitted... Hopefully the backend is doing something now.";
+        if (requestStatus == 0){
+            document.getElementById("status-container").innerHTML = "Finding direct tickets only...";
+            document.getElementById("result-container").innerHTML = "";
+            document.getElementById("outputTable").style.display = "none";
+        } else if (requestStatus == 1){
+            document.getElementById("status-container").innerHTML = "Finding single split tickets...";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
         } else {
-            document.getElementById("status-container").innerHTML = "Finding split tickets (may take a while...)";
+            document.getElementById("status-container").innerHTML = "Finding lots of split tickets... May take ages or go terribly wrong."
+            document.getElementById("result-container").innerHTML = "";
+            document.getElementById("outputTable").style.display = "none";
         }
         
         //If it's got this far, there are at least origin and destination stations

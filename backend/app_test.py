@@ -17,9 +17,9 @@ request_info = {"origin": origin,
                 "date": dt.today() + timedelta(days = 1), 
                 "end_time": datetime.time(13,0),
                 "ignore_previous": False,
-                "nchecks_init":10,
+                "nchecks_init":1,
                 "max_extra_time":65,
-                "request_depth":1
+                "request_depth":2
                 }   
 
 journeys = []

@@ -87,12 +87,12 @@ def find_basic_info(input_parameters, alljourneys = []):
             "Connection": "keep-alive",
         }
         async with sem:
-            async with session.get(url, headers=headers) as response:
+            async with session.get(url, headers=headers, timeout = 10.0) as response:
                 return await response.text()
 
     async def scrape_new(urls):
-        sem = asyncio.Semaphore(10)
-        connector = aiohttp.TCPConnector(limit=10)
+        sem = asyncio.Semaphore(20)
+        connector = aiohttp.TCPConnector(limit=20)
         async with aiohttp.ClientSession(connector = connector) as session:
             tasks = [fetch(sem, session, url) for url in urls]
             pages = await asyncio.gather(*tasks)
@@ -101,7 +101,7 @@ def find_basic_info(input_parameters, alljourneys = []):
     go = True
     startcount = 0
     stop_flags = np.zeros(len(start_times))   #Set to 1 once an individual has got too far.
-    wait_time = 15.0
+    wait_time = 60.0
 
 
     while go:
@@ -137,7 +137,7 @@ def find_basic_info(input_parameters, alljourneys = []):
 
             else:
                 #Don't need to back off, just go for it as is.'
-                wait_time = 15.0
+                wait_time = 60.0
 
                 dep = tree.xpath('//div[@class="dep"]/text()')
                 arr = tree.xpath('//div[@class="arr"]/text()')

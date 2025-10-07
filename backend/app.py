@@ -53,7 +53,6 @@ def trains():
         arrive_time = dt.strptime(input_data['arriveTime'].strip(), "%H:%M").time()
         depart_time = dt.strptime(input_data['departTime'].strip(), "%H:%M").time()
 
-
         if input_data['requestStatus'] == 0:  #Just look for the direct trains (no splitting)
             request_info = {"origin": origin, 
                             "destination": destination,
@@ -69,17 +68,30 @@ def trains():
                             "start_time": depart_time,
                             "end_time": arrive_time,
                             "ignore_previous": False,
-                            "nchecks_init":10,
-                            "max_extra_time":125,
+                            "nchecks_init":100,
+                            "max_extra_time":65,
                             "time_spread":10,
                             "request_depth":1
                             }
 
-        journeys = find_journeys(request_info)  #I'm pretty sure the filtering happens in here already.
+        elif input_data['requestStatus'] == 2:  #Look for more splits
+            request_info = {"origin": origin,
+                            "destination": destination,
+                            "date": date,
+                            "start_time": depart_time,
+                            "end_time": arrive_time,
+                            "ignore_previous": False,
+                            "nchecks_init":10,
+                            "max_extra_time":125,
+                            "time_spread":10,
+                            "request_depth":2
+                            }
 
-        return_data = journeys
+        journeys = find_journeys(request_info, splits = [])  #I'm pretty sure the filtering happens in here already.
 
-        return flask.Response(response=json.dumps(return_data), status=201)
+        return_data = journeys[0]
+
+        return flask.Response(response=json.dumps(return_data), status=201, mimetype='application/json' )
 
 #This bit should come last, I think, as it calls things from above
 if __name__ == "__main__":

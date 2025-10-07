@@ -68,7 +68,7 @@ def find_journeys(request_info, splits = []):
         nchecks_init = request_info.get("nchecks_init", 20)
         print(request_info["request_depth"], nesting_degree)
         if nesting_degree > 0:
-            nrequests_max = 2  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
+            nrequests_max = 1  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
             nchecks_init = int(nchecks_init//10) + 1 #Seems reasonable for extreme checks
         elif request_info["request_depth"] == 1 and nesting_degree == 0:
             nrequests_max = 50
@@ -82,6 +82,8 @@ def find_journeys(request_info, splits = []):
 
         if len(allchecks) > 0:
             nlumps = int(len(allchecks)/(nrequests_max/2) + 1)
+            if nlumps == 2:
+                nlumps = 1 #This is usually actually what you want
             nrequests_actual = len(allchecks)/nlumps + 1
 
             for lump in range(nlumps):
@@ -158,13 +160,16 @@ def find_journeys(request_info, splits = []):
                         'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps']
                     })
 
+        #print(len(allsplits),' unfiltered splits found between', request_info["origin"], 'and', request_info["destination"])
         splits.append(filter_splits(request_info, allsplits))
-        print(len(splits[0]), ' single splits found between', request_info["origin"], 'and', request_info["destination"])
+
+        print(len(splits[0]), ' journeys found between', request_info["origin"], 'and', request_info["destination"])
 
         return splits
     else:
         individual_journeys = []
         request_info["nesting_degree"] = nesting_degree
+        #print('REQUEST', request_info)
         find_basic_info(request_info, alljourneys = individual_journeys)
         id_count = 0
         alljourneys = []
@@ -174,7 +179,6 @@ def find_journeys(request_info, splits = []):
                 alljourneys.append(journey)
 
         splits.append(filter_splits(request_info, alljourneys))
-
         return splits
 
 def find_first_splits(request_info, station_checks):
