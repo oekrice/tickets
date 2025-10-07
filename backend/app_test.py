@@ -1,5 +1,5 @@
 #Test for basic functions
-from obtain_data import find_basic_info, find_station_info
+from obtain_data import find_basic_info, find_station_info, find_stations
 from data_functions import rank_stations, find_first_splits, filter_splits, find_journeys
 from datetime import datetime as dt, timedelta
 import datetime
@@ -19,8 +19,15 @@ request_info = {"origin": origin,
                 "ignore_previous": False,
                 "nchecks_init":1,
                 "max_extra_time":65,
-                "request_depth":2
+                "request_depth":1
                 }   
+
+#If request depth is greater than zero, then need to establish information regaring the stations in between
+
+if request_info["request_depth"] > 0:
+    station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
+
+
 
 journeys = []
 find_journeys(request_info, journeys)

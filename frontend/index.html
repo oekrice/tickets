@@ -7,7 +7,7 @@
 
 </head>
 
-<body>
+<body style="font-family:arial">
     <div>Find train information between two stations. Input your requirements and if it's fine it'll print some things.</div>
     <hr>
     <div>
@@ -46,7 +46,7 @@
             <th>Departs</th>
             <th>Arrives</th>
             <th>Price</th>
-            <th>Time</th>
+            <th>Journey Time</th>
         </tr>
     </table>
 
@@ -123,7 +123,11 @@
 
     function toPrice(rawPrice){
         //Just a simple function to convert price to the correct format
-        return "£" + rawPrice.toFixed(2);
+        if (rawPrice < 10){
+            return " £" + rawPrice.toFixed(2);
+        } else {
+            return "£" + rawPrice.toFixed(2);
+        }
     }
 
     function getDefaults(){
@@ -261,16 +265,16 @@
         const nsplits = trainData[trainNumber].split_stations.length
 
         if (nsplits == 0) {
-            returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp£' + trainData[trainNumber].split_prices[0].toFixed(2)
+            returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[0])
         } else {
-            returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].split_stations[0] + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].split_arrs[0]) + '&nbsp&nbsp£' + trainData[trainNumber].split_prices[0].toFixed(2)
+            returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].split_stations[0] + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].split_arrs[0]) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[0])
             returnString += '<br>'
             //Then middle splits (if any). Not sure how to test this very well...
             for (let i = 0; i < nsplits - 1; i++){
-            returnString += trainData[trainNumber].split_stations[i]+ '-' + trainData[trainNumber].split_stations[i+1] + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[i]) + '-' + toTime(trainData[trainNumber].split_arrs[i]) + '&nbsp&nbsp£' + trainData[trainNumber].split_prices[i+1].toFixed(2)
+            returnString += trainData[trainNumber].split_stations[i]+ '-' + trainData[trainNumber].split_stations[i+1] + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[i]) + '-' + toTime(trainData[trainNumber].split_arrs[i]) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[i+1])
             returnString += '<br>'
             }
-            returnString += trainData[trainNumber].split_stations[nsplits-1] + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[nsplits-1]) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp£' + trainData[trainNumber].split_prices[nsplits].toFixed(2)
+            returnString += trainData[trainNumber].split_stations[nsplits-1] + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[nsplits-1]) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[nsplits])
         }
 
         returnString += '</div>'

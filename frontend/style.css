@@ -1,7 +1,10 @@
 
 table {
   border-collapse: collapse;
-  width: 180px;
+  width: 100%;
+  border-style: solid;
+  border-width: thin;
+  border-color: white
 }
 
 th, td {
@@ -9,13 +12,13 @@ th, td {
   padding: 8px;
 }
 
-
 tr.details {
     display:none;
      background-color: #33cfff;
     border-collapse: collapse;
     border-style: solid;
-    border-width: thin
+    border-width: thin;
+    font-family:'Courier New'
 }
 
 
