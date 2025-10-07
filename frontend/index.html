@@ -271,7 +271,7 @@
             returnString += '<br>'
             //Then middle splits (if any). Not sure how to test this very well...
             for (let i = 0; i < nsplits - 1; i++){
-            returnString += trainData[trainNumber].split_stations[i]+ '-' + trainData[trainNumber].split_stations[i+1] + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[i]) + '-' + toTime(trainData[trainNumber].split_arrs[i]) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[i+1])
+            returnString += trainData[trainNumber].split_stations[i]+ '-' + trainData[trainNumber].split_stations[i+1] + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[i]) + '-' + toTime(trainData[trainNumber].split_arrs[i+1]) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[i+1])
             returnString += '<br>'
             }
             returnString += trainData[trainNumber].split_stations[nsplits-1] + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[nsplits-1]) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[nsplits])
@@ -345,8 +345,8 @@
             document.getElementById("outputTable").style.display = "none";
         } else {
             document.getElementById("status-container").innerHTML = "Finding lots of split tickets... May take ages or go terribly wrong."
-            document.getElementById("result-container").innerHTML = "";
-            document.getElementById("outputTable").style.display = "none";
+            //document.getElementById("result-container").innerHTML = "";
+            //document.getElementById("outputTable").style.display = "none";
         }
         
         //If it's got this far, there are at least origin and destination stations
