@@ -5,7 +5,7 @@ import flask
 import json
 from flask_cors import CORS
 import time
-from obtain_data import find_basic_info, find_station_info
+from obtain_data import find_basic_info, find_station_info, find_stations
 from data_functions import rank_stations, find_first_splits, filter_splits, find_journeys
 from datetime import datetime as dt, timedelta
 from pathlib import Path
@@ -68,8 +68,8 @@ def trains():
                             "start_time": depart_time,
                             "end_time": arrive_time,
                             "ignore_previous": False,
-                            "nchecks_init":10,
-                            "max_extra_time":65,
+                            "nchecks_init":100,
+                            "max_extra_time":125,
                             "time_spread":10,
                             "request_depth":1
                             }
@@ -81,15 +81,32 @@ def trains():
                             "start_time": depart_time,
                             "end_time": arrive_time,
                             "ignore_previous": False,
-                            "nchecks_init":10,
+                            "nchecks_init":100,
                             "max_extra_time":125,
                             "time_spread":10,
-                            "request_depth":2
+                            "request_depth":1
                             }
 
-        journeys = find_journeys(request_info, splits = [])  #I'm pretty sure the filtering happens in here already.
+        #If request depth is greater than zero, then need to establish information regaring the stations in between
+        if request_info["request_depth"] == 0:
+            #This is just a basic request. So do that.
+            journeys = find_basic_info(request_info, [])
+            journeys = filter_splits(request_info, journeys)
+            print(len(journeys), ' valid journeys after filtering')
 
-        return_data = journeys[0]
+        else:
+            station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
+
+            #The checks at this point will depend on the magnitude of the request
+            station_checks = rank_stations(request_info, station_info) #This is automatically filtered to the right level later on
+
+            print('Finding single splits between', request_info["origin"], 'and', request_info["destination"])
+            journeys = find_first_splits(request_info, station_checks)
+            print(len(journeys), ' valid journeys before filtering')
+            journeys = filter_splits(request_info, journeys)
+            print(len(journeys), ' valid journeys after filtering')
+
+        return_data = journeys
 
         return flask.Response(response=json.dumps(return_data), status=201, mimetype='application/json' )
 

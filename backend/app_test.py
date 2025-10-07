@@ -10,24 +10,38 @@ matplotlib.use("Agg")
 
 #source ../.venv/bin/activate.csh
 
-origin = "NCL"; destination = "YRK"
+origin = "NCL"; destination = "LDS"
 request_info = {"origin": origin, 
                 "destination": destination, 
                 "start_time": datetime.time(9,0), 
                 "date": dt.today() + timedelta(days = 1), 
                 "end_time": datetime.time(13,0),
                 "ignore_previous": False,
-                "nchecks_init":1,
-                "max_extra_time":65,
-                "request_depth":1
+                "nchecks_init":100,
+                "max_extra_time":125,
+                "request_depth":1,
+                "check_number": 0   #For the second level of request depths, which can take some time.
                 }   
 
 #If request depth is greater than zero, then need to establish information regaring the stations in between
+if request_info["request_depth"] == 0:
+    #This is just a basic request. So do that.
+    journeys = find_basic_info(request_info, [])
+    journeys = filter_splits(request_info, journeys)
 
-if request_info["request_depth"] > 0:
+else:
     station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
 
+    #The checks at this point will depend on the magnitude of the request
+    station_checks = rank_stations(request_info, station_info) #This is automatically filtered to the right level later on
 
+    print('Finding single splits between', request_info["origin"], 'and', request_info["destination"])
+    journeys = find_first_splits(request_info, station_checks)
+    print(len(journeys), ' valid journeys before filtering')
+    journeys = filter_splits(request_info, journeys)
+    print(len(journeys), ' valid journeys after filtering')
+
+sys.exit()
 
 journeys = []
 find_journeys(request_info, journeys)

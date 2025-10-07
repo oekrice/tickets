@@ -50,7 +50,7 @@ def find_basic_info(input_parameters, alljourneys = []):
 
     overall_start_time = t_start
 
-    multithread_cadence = 15  #Cadence in minutes for the remaining hours of the day. This will need playing with a bit to optimise I imagine. 60 minutes seems fine
+    multithread_cadence = 60  #Cadence in minutes for the remaining hours of the day. This will need playing with a bit to optimise I imagine. 60 minutes seems fine
     #Establish the required start times here
     if start_only or end_only:  #Partial searches
         start_times = [t_start]; end_times = [t_end]
@@ -210,6 +210,7 @@ def find_basic_info(input_parameters, alljourneys = []):
 
 def find_stations(request_info):
 
+
     origin = request_info['origin']
     destination = request_info['destination']
     filename = "./station_data/%s_%s.json" % (origin, destination)
@@ -246,21 +247,47 @@ def find_stations(request_info):
             station_list.append(station)
     print('Looking at', len(station_list), 'stations between',  request_info["origin"], 'and', request_info["destination"])
 
-    sys.exit()
+    USER_AGENTS = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/130.0",
+    ]
+
+    async def fetch(sem, session, url):
+        await asyncio.sleep(random.uniform(0.1, 1.0))
+        headers = {
+            "User-Agent": random.choice(USER_AGENTS),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
+        }
+        async with sem:
+            async with session.get(url, headers=headers, timeout = 5.0) as response: #This can get stuck. Not sure how to fix that yet but the internet will know.
+                return await response.text()
+
+    async def scrape_new(urls):
+        sem = asyncio.Semaphore(50)
+        connector = aiohttp.TCPConnector(limit=50)
+        async with aiohttp.ClientSession(connector = connector) as session:
+            tasks = [fetch(sem, session, url) for url in urls]
+            pages = await asyncio.gather(*tasks)
+        return pages
 
     alljourneys = []
-    #Separate this out into lumps
-    if nesting_degree == 0:
-        nrequests_max = 100
-    else:
-        nrequests_max = 10
+    #Separate this out into lumps. Should always be fine to do this one after another now, so can make 100 odd requests with impunity
+    nrequests_max = 200
+
     nlumps = int(len(station_list)/(nrequests_max/2) + 1)
     nrequests_actual = len(station_list)/nlumps + 1
     modified_request_info = request_info.copy()
     modified_request_info["date"] = request_info["date"] + timedelta(days = 10)   #Look a week ahead of the actual request time. For reasons I'm deciding which are entirely arbitrary.
     modified_request_info["start_time"] = datetime.time(9,00)
     modified_request_info["end_time"] = datetime.time(23,59)
-    for lump in range(nlumps):
+
+    dolumps = True; lump = 0
+    alljourneys = []
+    while dolumps:
+        urls = []; origins = []; destinations = []
         threads = []; lumpcount = 0
         minstat = int(nrequests_actual*lump); maxstat = int(min(nrequests_actual*(lump+1), len(station_list)))
         for station in station_list[minstat:maxstat]:  #Alas this bit needs some multithreading, as it's far too slow.
@@ -274,16 +301,57 @@ def find_stations(request_info):
             input_parameters_second["origin"] = station
             input_parameters_second["start_only"] = True
 
-            x = threading.Thread(target=find_basic_info, args=(input_parameters_first, alljourneys), daemon = False)
-            threads.append(x)
-            x.start()
+            #Make the urls here. Don't need much bloat really.
+            url = makeurl_nr(origin, station, request_info["date"] + timedelta(days = 10) , datetime.time(9,00), arr_flag = False)
+            urls.append(url); origins.append(origin); destinations.append(station)
+            url = makeurl_nr(station, destination, request_info["date"] + timedelta(days = 10) , datetime.time(9,00), arr_flag = False)
+            urls.append(url); origins.append(station); destinations.append(destination)
 
-            x = threading.Thread(target=find_basic_info, args=(input_parameters_second, alljourneys), daemon = False)
-            threads.append(x)
-            x.start()
+        pages = asyncio.run(scrape_new(urls))
 
-        for j, x in enumerate(threads):
-            x.join()
+        #Pages for all the journeys. Doeesn't matter which order they arrive (lovely)
+        alliswell = True
+        for page in pages:
+            if len(page) == 118:
+                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for', wait_time, 'seconds.')
+                alliswell = False
+
+        if alliswell:
+            print('%d percent of stations checked...' % (100*maxstat/len(station_list)))
+
+            for pi, page in enumerate(pages):
+                tree = html.fromstring(page)
+                journeys = []
+                dep = tree.xpath('//div[@class="dep"]/text()')
+                arr = tree.xpath('//div[@class="arr"]/text()')
+                price = tree.xpath('//label[@class="opsingle"]/text()')
+
+                if len(dep) > 0 and len(price) == len(dep)*2:
+                    #Check the number of priaces matches the number of departures/arrivals
+                    maxdep = dt.strptime("00:01", "%H:%M").time()
+                    maxarr = dt.strptime("00:01", "%H:%M").time()
+                    for i in range(len(dep)):
+                        dep1 = dt.strptime(dep[i].strip(), "%H:%M").time()
+                        arr1 = dt.strptime(arr[i].strip(), "%H:%M").time()
+                        maxdep = max(maxdep, dep1)  #This seems fine!
+                        maxarr = max(maxarr, arr1)
+                        #Sometimes no fares are available for various reasons. Just don't list these
+                        if len(price[i*2+1].strip()) == 0:
+                            pass
+                        else:
+                            p1 = float(price[i*2 + 1].strip()[1:])
+                            journeys.append({"origin": origins[pi], "destination": destinations[pi], "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1,      'split_stations':[], 'split_arrs':[], 'split_deps':[],'split_prices':[p1]})
+                alljourneys.append(journeys)
+            lump += 1
+
+        else:
+            #Back off and let national rail recover...
+            time.sleep(60.0)
+
+        #If all is well, figure out journey times etc. at this point from the raw html
+
+        if lump >= nlumps:
+            dolumps = False
 
     reftime = 1e6
     for journeys in alljourneys:
