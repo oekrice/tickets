@@ -19,7 +19,7 @@ request_info = {"origin": origin,
                 "ignore_previous": False,
                 "nchecks_init":10,
                 "max_extra_time":65,
-                "request_depth":2
+                "request_depth":1
                 }   
 
 journeys = []

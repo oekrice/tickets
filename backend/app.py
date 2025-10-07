@@ -55,7 +55,12 @@ def trains():
 
 
         if input_data['requestStatus'] == 0:  #Just look for the direct trains (no splitting)
-            request_info = {"origin": origin, "destination": destination, "date": date, "start_time": depart_time, "end_time": arrive_time, "request_depth": 0}   #Can add time constraints to this later. Or immediately? Yes, that should be the next thing.
+            request_info = {"origin": origin, 
+                            "destination": destination,
+                            "date": date, 
+                            "start_time": depart_time, 
+                            "end_time": arrive_time, 
+                            "request_depth": 0}   #Can add time constraints to this later. Or immediately? Yes, that should be the next thing.
 
         elif input_data['requestStatus'] == 1:  #Look for single splits
             request_info = {"origin": origin,
@@ -66,7 +71,7 @@ def trains():
                             "ignore_previous": False,
                             "nchecks_init":10,
                             "max_extra_time":125,
-                            "time_spread":10
+                            "time_spread":10,
                             "request_depth":1
                             }
 
