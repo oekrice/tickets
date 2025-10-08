@@ -18,7 +18,8 @@ tr.details {
     border-collapse: collapse;
     border-style: solid;
     border-width: thin;
-    font-family:'Courier New'
+    font-family:'Courier New';
+    border-color: 'black'
 }
 
 

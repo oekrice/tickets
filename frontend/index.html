@@ -8,11 +8,12 @@
 </head>
 
 <body style="font-family:arial">
-    <div>Find train information between two stations. Input your requirements and if it's fine it'll print some things.</div>
+    <div>Find train ticket information between two stations. <br></b>
+         Input your requirements and if it's a reasonable request it'll tell you some things.</div>
     <hr>
     <div>
-        <label for="origin-input">Origin Station: </label>
-        <input  list="station-list" id="origin-input" placeholder = "Newcastle (NCL)"> 
+        <label for="origin-input">Origin Station:</label>
+        <input  list="station-list" id="origin-input" placeholder = "Durham (DHM)"> 
         <datalist id="station-list">
     </div>
     <div>
@@ -35,9 +36,10 @@
 
     <hr>
     <div>
-        <button onclick=getTrains(0)>Get basic train data</button>
-        <button onclick=getTrains(1)>Get split ticket data</button>
-        <button onclick=getTrains(2)>Get very split ticket data</button>
+        <button onclick=getTrains(0)>Get 'direct' trains</button>
+        <button onclick=getTrains(1)>Get basic split tickets</button>
+        <button onclick=getTrains(2)>Get detailed split tickets</button>
+
     <hr>
     <div id="status-container"></div>
     <div id="result-container"></div>
@@ -58,57 +60,133 @@
     let originStation, destinationStation
     let trainDate, departTime, arriveTime
     let inputParameters
-    let trainDataRaw, trainData
+    let trainDataRaw, trainData, existingData
     let stationData
+    let detailFlag = false
+    trainData = []
     //Update default parameters in the search bar (date etc.) and obtain the list of allowed stations
     getDefaults();
 
     async function getTrains(requestStatus) {
         //Send the parameters to Python and wait for a response...
         //let requestStatus = 1
-        let dataToSend = packageInputData(requestStatus);   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
-        let resultInfo 
-        let parser, xmlDoc
-        parser = new DOMParser()
-        // console.log(dataToSend);
-        if (!dataToSend) {
-            console.log("Insufficient data entered. Aborting.");
-            return;
-        }
 
-        try {
-            // Send the POST request
-            const response = await fetch("http://localhost:14752/trains", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json;charset=UTF-8"
-                },
-                body: JSON.stringify(dataToSend)
-            });
+        //If requestStatus is 0 or 1, this is simple. If not, it needs to be in a loop to obtain stations in due course. 
 
-            if (response.status === 201) {
-                // console.log("Data creation response received!");
-                trainDataRaw = await response.text();
-                trainData = JSON.parse(trainDataRaw)  //Object containing the train outputs
-                xmlDoc = parser.parseFromString(trainDataRaw,"text/xml")
-                //At this point trigger a function to enable the HTML to make a nice table of the results
-                makeResultTable(trainData)
-
-                //If no results found, say as much and don't display the table
-                if (trainData.length == 0) {
-                    resultInfo = "No trains found."
-                } else {
-                    resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click on them for more info."
-                    document.getElementById("outputTable").style.display = "block";
-                }
-                document.getElementById("status-container").innerHTML = resultInfo;
-
-                //document.getElementById('result-container').innerHTML = trainDataRaw;  //This is the bit which actually updates the result text, which is probably as a string. Would be better as an object...
-            } else {
-                console.error("Request failed with status:", response.status);
+        if (requestStatus < 2){
+            let dataToSend = packageInputData(requestStatus, 0);   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
+            let resultInfo 
+            let parser, xmlDoc
+            parser = new DOMParser()
+            // console.log(dataToSend);
+            if (!dataToSend) {
+                console.log("Insufficient data entered. Aborting.");
+                return;
             }
-        } catch (error) {
-            console.error("Network error:", error);
+
+            try {
+                // Send the POST request
+                const response = await fetch("http://localhost:14752/trains", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json;charset=UTF-8"
+                    },
+                    body: JSON.stringify(dataToSend)
+                });
+
+                if (response.status === 201) {
+                    // console.log("Data creation response received!");
+                    trainDataRaw = await response.text();
+                    trainData = JSON.parse(trainDataRaw)  //Object containing the train outputs
+                    xmlDoc = parser.parseFromString(trainDataRaw,"text/xml")
+                    //At this point trigger a function to enable the HTML to make a nice table of the results
+                    makeResultTable(trainData)
+
+                    //If no results found, say as much and don't display the table
+                    if (trainData.length == 0) {
+                        resultInfo = "No trains found."
+                    } else {
+                        resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
+                        document.getElementById("outputTable").style.display = "block";
+                    }
+                    document.getElementById("status-container").innerHTML = resultInfo;
+
+                    //document.getElementById('result-container').innerHTML = trainDataRaw;  //This is the bit which actually updates the result text, which is probably as a string. Would be better as an object...
+                } else {
+                    resultInfo = 'Request failed for some reason. Try something else?'
+                    document.getElementById("status-container").innerHTML = resultInfo;
+                    console.error("Request failed with status:", response.status);
+                }
+            } catch (error) {
+                resultInfo = "It appears that the server isn't running. Bugger.  <br> Please let me know (if you're not me)."
+                document.getElementById("status-container").innerHTML = resultInfo;
+                console.error("Network error:", error);
+            }
+
+        } else {
+            document.getElementById("status-container").innerHTML = "Attempting a loop thing"
+            //Send initial request as per?
+            let i = 0
+            let resultInfo 
+            let dataToSend
+            let parser, xmlDoc
+            while (i < 11){
+                dataToSend = packageInputData(requestStatus, i);   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
+                parser = new DOMParser()
+                existingData = trainData
+                if (!dataToSend) {
+                    console.log("Insufficient data entered. Aborting.");
+                    return;
+                }
+
+                try {
+                    // Send the POST request
+                    const response = await fetch("http://localhost:14752/trains", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json;charset=UTF-8"
+                        },
+                        body: JSON.stringify(dataToSend)
+                    });
+
+                    if (response.status === 201) {
+                        // console.log("Data creation response received!");
+                        trainDataRaw = await response.text();
+                        trainData = JSON.parse(trainDataRaw)  //Object containing the train outputs
+                        xmlDoc = parser.parseFromString(trainDataRaw,"text/xml")
+                        //At this point trigger a function to enable the HTML to make a nice table of the results
+
+                        //If no results found, say as much and don't display the table
+                        if (trainData.length == 0 && existingData.length == 0) {
+                            resultInfo = "No trains found."
+                        } else if (trainData.length > 0) {
+                            resultInfo = 'Still finding trains... Currently found ' + trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
+                            document.getElementById("outputTable").style.display = "block";
+                        document.getElementById("status-container").innerHTML = resultInfo;
+                            makeResultTable(trainData)
+                        } else if (trainData.length == 0 && existingData.length > 0) {   //This is done now. Just leave it as is if possible.
+                            resultInfo = 'Finished. ' + existingData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
+                            document.getElementById("outputTable").style.display = "block";
+                        }
+                        document.getElementById("status-container").innerHTML = resultInfo;
+                    } else {                             
+                        resultInfo = 'Request failed for some reason. Try something else?'
+                        document.getElementById("status-container").innerHTML = resultInfo;
+                        console.error("Request failed with status:", response.status);
+                    }
+                } catch (error) {
+                    resultInfo = "It appears that the server isn't running. Bugger.  <br> Please let me know (if you're not me)."
+                    document.getElementById("status-container").innerHTML = resultInfo;
+                    console.error("Network error:", error);
+                }
+                if (trainData.length == 0) break;   //Whatever has happened before, it's time to stop
+                i ++
+            }
+            //Finish off with a message
+            resultInfo = 'Finished. ' + existingData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
+            document.getElementById("status-container").innerHTML = resultInfo;
+
+            //Need to figure out how many stations to check here (can definitely specify in due course). Perhaps a timeout is wise to stop sending requests?
         }
     }
 
@@ -136,7 +214,7 @@
         let today = new Date();
         let fivemins = new Date();
         let threehours = new Date();
-        fivemins.setMinutes(fivemins.getMinutes() + 5)
+        fivemins.setMinutes(fivemins.getMinutes() + 15)
         threehours.setMinutes(threehours.getMinutes() + 180)
         console.log(threehours)
         let todayString = today.toISOString().split('T')[0];
@@ -282,13 +360,13 @@
         return returnString
     }
 
-    function packageInputData(requestStatus){
+    function packageInputData(requestStatus, checkNumber){
         let departMinutes, arriveMinutes
         //This is for taking the input data, checking if it exists and compiling into a 'dictionary' for jsonifying. Not sure what the correct approach here is but I think it's the same as python...
         originStation = document.getElementById('origin-input').value;
         originStation = String(originStation).substring(originStation.length-4,originStation.length-1)
         if (!originStation) {
-            originStation = "NCL"
+            originStation = "DHM"
             // console.log("No origin station.");
             // document.getElementById("status-container").innerHTML = "Please input an origin station and try again.";
             // document.getElementById("result-container").innerHTML = "";
@@ -318,6 +396,7 @@
             document.getElementById("status-container").innerHTML = "Arrival time must be after departure time.";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
+            trainData = []
             return;
         }
 
@@ -339,18 +418,25 @@
             document.getElementById("status-container").innerHTML = "Finding direct tickets only...";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
+            trainData = []
         } else if (requestStatus == 1){
-            document.getElementById("status-container").innerHTML = "Finding single split tickets...";
+            document.getElementById("status-container").innerHTML = "Finding single split tickets. May take a while if this is the first time.";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
-        } else {
-            document.getElementById("status-container").innerHTML = "Finding lots of split tickets... May take ages or go terribly wrong."
-            //document.getElementById("result-container").innerHTML = "";
-            //document.getElementById("outputTable").style.display = "none";
+            trainData = []
+        } else if (checkNumber == 0) {
+            document.getElementById("status-container").innerHTML = "Finding lots of split tickets... May take ages or go terribly wrong, but we'll see."
+            //Don't delete existing train data? Yes, don't. And can put the packages in a loop maybe? Can try this with console. 
         }
         
         //If it's got this far, there are at least origin and destination stations
-        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":trainDate, "departTime": departTime, "arriveTime": arriveTime};
+        //If there is already some train data, send this along with the python so it doesn't need to be done multiple times. Filtering will take longer but I think that's fine.
+
+        if (trainData.length > 0){
+            inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":trainDate, "departTime": departTime, "arriveTime": arriveTime, "checkNumber": checkNumber, "trainData":trainData};
+        } else {
+        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":trainDate, "departTime": departTime, "arriveTime": arriveTime, "checkNumber": checkNumber};
+        }
         console.log(inputParameters)
         return inputParameters;
     }

@@ -101,8 +101,6 @@ def find_basic_info(input_parameters, alljourneys = []):
     go = True
     startcount = 0
     stop_flags = np.zeros(len(start_times))   #Set to 1 once an individual has got too far.
-    wait_time = 60.0
-
 
     while go:
         #The main loop for generating urls. Hopefully not that long.
@@ -128,9 +126,8 @@ def find_basic_info(input_parameters, alljourneys = []):
             tree = html.fromstring(page)
 
             if len(page) == 118:
-                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for', wait_time, 'seconds.')
-                time.sleep(wait_time)
-                wait_time = min(60, wait_time*2)
+                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a bit and trying again.')
+                time.sleep(120.0 + 10.*random.uniform(0,1))
                 success = False
                 start_times = start_times_current.copy()
                 break #Don't carry on with these pages, try again with the same data
@@ -348,21 +345,22 @@ def find_stations(request_info):
 
         else:
             #Back off and let national rail recover...
-            time.sleep(120.0)
+            time.sleep(120.0 + 10.*random.uniform(0,1))
 
         #If all is well, figure out journey times etc. at this point from the raw html
 
         if lump >= nlumps:
             dolumps = False
 
-    reftime = 1e6
+    reftime = 0
     for journeys in alljourneys:
         if len(journeys) > 0:
-            mintime = 1e6; minprice = 1e6
+            mintime = 1e6; minprice = 1e6; maxtime = 0.
             for journey in journeys:
                 t0 = dt.strptime(journey["dep_time"], "%H%M")
                 t1 = dt.strptime(journey["arr_time"], "%H%M")
                 mintime = min(mintime, abs(t1 - t0).total_seconds()/60)
+                maxtime = max(mintime, abs(t1 - t0).total_seconds()/60)
                 minprice = min(minprice, journey["price"])
             if journey['origin'] == origin:  #This is the first split
                 station_data[journey['destination']]['time1'] = mintime
@@ -373,7 +371,7 @@ def find_stations(request_info):
             if journey['origin'] == origin and journey['destination'] == destination:
                 station_data[journey['origin']]['time1'] = mintime
                 station_data[journey['origin']]['price1'] = minprice
-                reftime = min(reftime, mintime)
+                reftime = max(reftime, maxtime)
             #Set the reference time if it is both. This is a bit ugly but can't really be helped
 
     #Use this data to determine the final station data (filter out impossible ones and things, and give some kind of scores. Time score plus price score (both to be minimised?)
@@ -419,7 +417,7 @@ def find_station_info(request_info):
 
     #This should be roughly similar for the same pair of stations each time, so can probably be cached or equivalent. It's certainly quite slow :(
 
-    max_deviation = request_info.get("max_deviation",0.4)   #How far off the route to go. Some can really get quite improbable so it's worth setting this quite high...
+    max_deviation = request_info.get("max_deviation",0.5)   #How far off the route to go. Some can really get quite improbable so it's worth setting this quite high...
     all_station_data = json.loads(open('./station_info.json').read())
     station_data = {}; station_list = []
     x0 = (all_station_data[origin]['latitude'], all_station_data[origin]['longitude']); x2 = (all_station_data[destination]['latitude'], all_station_data[destination]['longitude'])
@@ -476,14 +474,15 @@ def find_station_info(request_info):
             x.join()
 
         print('%d percent of stations checked...' % (100*maxstat/len(station_list)))
-    reftime = 1e6
+    reftime = 0
     for journeys in alljourneys:
         if len(journeys) > 0:
-            mintime = 1e6; minprice = 1e6
+            mintime = 1e6; minprice = 1e6; maxtime = 0.
             for journey in journeys:
                 t0 = dt.strptime(journey["dep_time"], "%H%M")
                 t1 = dt.strptime(journey["arr_time"], "%H%M")
                 mintime = min(mintime, abs(t1 - t0).total_seconds()/60)
+                maxtime = max(mintime, abs(t1 - t0).total_seconds()/60)
                 minprice = min(minprice, journey["price"])
             if journey['origin'] == origin:  #This is the first split
                 station_data[journey['destination']]['time1'] = mintime
@@ -494,7 +493,7 @@ def find_station_info(request_info):
             if journey['origin'] == origin and journey['destination'] == destination:
                 station_data[journey['origin']]['time1'] = mintime
                 station_data[journey['origin']]['price1'] = minprice
-                reftime = min(reftime, mintime)
+                reftime = max(reftime, maxtime)
             #Set the reference time if it is both. This is a bit ugly but can't really be helped
 
     #Use this data to determine the final station data (filter out impossible ones and things, and give some kind of scores. Time score plus price score (both to be minimised?)

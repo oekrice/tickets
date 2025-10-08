@@ -17,7 +17,6 @@ def rank_stations(request_info, station_info, rank_type):
 
     #Determine maximum time for this connection
     extra_time = request_info.get("max_extra_time",125)
-    nesting_degree = request_info.get("nesting_degree",0)
     t0 = request_info['start_time'].hour*60 + request_info['start_time'].minute
     t1 = request_info['end_time'].hour*60 + request_info['end_time'].minute
     max_time = t1 - t0
@@ -26,7 +25,7 @@ def rank_stations(request_info, station_info, rank_type):
 
     times = []; prices = []; stats= []
     for station in station_info:
-        #Filter stations based on the timing above. Need a hard cutoff here which will actually reduce as the constraints become more extreme
+        #Filter stations based on the timing above. Need a hard cutoff here which will actually reduce as the constraints become more extreme.
         local_start_time = t0 + station_info[station]["in_time"]
         local_end_time = t1 - station_info[station]["out_time"]
         if rank_type == 1:
@@ -38,9 +37,12 @@ def rank_stations(request_info, station_info, rank_type):
         else:
             if (local_start_time <=  local_end_time) and (station_info[station]["in_time"] + station_info[station]["out_time"] < max_time) and station != request_info["destination"] and station_info[station]["progress"] < 0.75 and station_info[station]["progress"] > 0.25:
                 #Sort the stations based on the above
-                prices.append(station_info[station]["price_score"])
-                times.append(station_info[station]["time_score"])
-                stats.append([station, local_start_time, local_end_time])
+                #ONLY KEEP ONES ENROUTE
+                
+                if station_info[station]["time_score"] <= 0.:   #Only enroute or very close to it
+                    prices.append(station_info[station]["price_score"])
+                    times.append(station_info[station]["time_score"])
+                    stats.append([station, local_start_time, local_end_time])
 
     timelist = [stat for _, stat in sorted(zip(times, stats))]
     pricelist = [stat for _, stat in sorted(zip(prices, stats))]
@@ -48,9 +50,6 @@ def rank_stations(request_info, station_info, rank_type):
     bothlist = [None]*(len(timelist) + len(pricelist))
     bothlist[::2] = timelist
     bothlist[1::2] = pricelist
-
-    print(timelist[:10])
-    print(pricelist[:10])
 
     final_list = []
     basic_list = []
@@ -63,8 +62,7 @@ def rank_stations(request_info, station_info, rank_type):
                 #Perhaps can focus efforts elsewhere in this regard...
                 final_list.append(bothlist[i])
                 basic_list.append(bothlist[i][0])
-    else:  #Just keep the stations which are en-route
-        #Remove duplicates and things
+    else:  #Just keep the stations which are en-route, so can actually complete things.
         for i in range(len(timelist)):
             final_list.append(timelist[i])
             basic_list.append(timelist[i][0])

@@ -9,6 +9,7 @@ from obtain_data import find_basic_info, find_station_info, find_stations
 from data_functions import rank_stations, find_first_splits, find_second_splits, find_journeys, find_second_splits, filter_splits
 from datetime import datetime as dt, timedelta
 from pathlib import Path
+import sys
 import datetime
 
 #sys.path.append("/extra/tmp/vgjn10/python/")
@@ -74,7 +75,7 @@ def trains():
                             "request_depth":1
                             }
 
-        elif input_data['requestStatus'] == 2:  #Look for more splits
+        elif input_data['requestStatus'] == 2:  #Look for more splits. Now depends on a status.
             request_info = {"origin": origin,
                             "destination": destination,
                             "date": date,
@@ -84,34 +85,45 @@ def trains():
                             "nchecks_init":100,
                             "max_extra_time":125,
                             "time_spread":10,
-                            "request_depth":2
+                            "request_depth":2,
+                            "check_number":input_data['checkNumber']
                             }
+        existing_journeys = input_data.get('trainData', []) #Obtain these to be appended to if necessary
 
+        print('Received request with details', request_info, 'and', len(existing_journeys), 'existing journeys')
         if request_info["request_depth"] == 0:
             #This is just a basic request. So do that.
             journeys = find_basic_info(request_info, [])
             journeys = filter_splits(request_info, journeys)
             return_data = journeys
 
-        else:
+        elif request_info["request_depth"] == 1 or (request_info["request_depth"] == 2 and request_info["check_number"] == 0):
             station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
 
             #The checks at this point will depend on the magnitude of the request
             station_checks = rank_stations(request_info, station_info, 1) #This is automatically filtered to the right level later on
+            # print('Testing')
+            # second_checks = rank_stations(request_info, station_info, 2)
 
             print('Finding single splits between', request_info["origin"], 'and', request_info["destination"])
             journeys = find_first_splits(request_info, station_checks)
             print(len(journeys), ' valid journeys before filtering, stage 1')
             journeys = filter_splits(request_info, journeys)
             print(len(journeys), ' valid journeys after filtering, stage 1')
+            return_data = journeys
 
-            if request_info["request_depth"] == 2 and len(journeys) > 0:
-                journeys = [journeys]
+        elif (request_info["request_depth"] == 2 and request_info["check_number"] > 0):
+            if request_info["request_depth"] == 2 and len(existing_journeys) > 0:
+                journeys = [existing_journeys]
                 station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
                 second_checks = rank_stations(request_info, station_info, 2)
+                print('All second checks', second_checks)
                 #Run through these second checks as if they are firsts.
-
-                for station in second_checks[:5]:
+                if request_info["check_number"] > len(second_checks):
+                    #print('Testing exceeding the length of the list')
+                    return flask.Response(response=json.dumps([]), status=201, mimetype='application/json' )
+                else:                     
+                    station = second_checks[request_info["check_number"] - 1]
                     print('Trying stage 2 split at', station[0])
                     journeys.append(find_second_splits(request_info, station))
 
@@ -128,9 +140,7 @@ def trains():
                 print(len(alljourneys), ' valid journeys after filtering stage 2')
 
                 return_data = alljourneys
-            else:
-                return_data = journeys
-
+                                    
         return flask.Response(response=json.dumps(return_data), status=201, mimetype='application/json' )
 
 #This bit should come last, I think, as it calls things from above
