@@ -404,7 +404,7 @@
         let today = new Date();
         let todayString = today.toISOString().split('T')[0];
         let timeString = String(today.getHours()).padStart(2,'0') + ":" + String(today.getMinutes()).padStart(2,'0')
-        if (document.getElementById('date-input').value == todayString){
+        if (document.getElementById('date-input').value == todayString && checkNumber == 0){
             if (timeString.substring(0,2) + timeString.substring(3,5) > departTime.substring(0,2) + departTime.substring(3,5)){
                 console.log("Departs in the past");
                 document.getElementById("status-container").innerHTML = "Departure time must not be in the past.";

@@ -116,8 +116,11 @@ def find_basic_info(input_parameters, alljourneys = []):
 
         start_times_current = start_times.copy()
         start_times = []  #Need to reset and do this each time
-
-        pages = asyncio.run(scrape_new(urls))
+        #New bit of code to stop asyncio getting confused.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        pages = loop.run_until_complete(scrape_new(urls))
+        loop.close()
         pi = 0
         success = True
         for pi, page in enumerate(pages):
@@ -126,8 +129,8 @@ def find_basic_info(input_parameters, alljourneys = []):
             tree = html.fromstring(page)
 
             if len(page) == 118:
-                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a bit and trying again.')
-                time.sleep(120.0 + 10.*random.uniform(0,1))
+                #print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a bit and trying again.')
+                time.sleep(60.0 + 10.*random.uniform(0,1))
                 success = False
                 start_times = start_times_current.copy()
                 break #Don't carry on with these pages, try again with the same data
@@ -209,12 +212,10 @@ def find_basic_info(input_parameters, alljourneys = []):
 
 def find_stations(request_info):
 
-
     origin = request_info['origin']
     destination = request_info['destination']
     filename = "./station_data/%s_%s.json" % (origin, destination)
     ignore_previous = request_info.get("ignore_previous",False)
-    nesting_degree = request_info.get("nesting_degree", 0)
     #Create folder if necessary
     Path("station_data").mkdir(parents=True, exist_ok=True)
     #Initially check if a file for this combination already exists, and if so use that
@@ -265,8 +266,8 @@ def find_stations(request_info):
                 return await response.text()
 
     async def scrape_new(urls):
-        sem = asyncio.Semaphore(50)
-        connector = aiohttp.TCPConnector(limit=50)
+        sem = asyncio.Semaphore(25)
+        connector = aiohttp.TCPConnector(limit=25)
         async with aiohttp.ClientSession(connector = connector) as session:
             tasks = [fetch(sem, session, url) for url in urls]
             pages = await asyncio.gather(*tasks)
@@ -274,12 +275,17 @@ def find_stations(request_info):
 
     alljourneys = []
     #Separate this out into lumps. Should always be fine to do this one after another now, so can make 100 odd requests with impunity
-    nrequests_max = 200
+    nrequests_max = 100
 
     nlumps = int(len(station_list)/(nrequests_max/2) + 1)
     nrequests_actual = len(station_list)/nlumps + 1
     modified_request_info = request_info.copy()
-    modified_request_info["date"] = request_info["date"] + timedelta(days = 10)   #Look a week ahead of the actual request time. For reasons I'm deciding which are entirely arbitrary.
+    realdate = request_info["date"]
+    realdate = realdate + timedelta(days = 7)
+    while realdate.weekday() >= 5:
+        realdate += timedelta(days = 1)
+
+    modified_request_info["date"] = realdate   #Look a week ahead of the actual request time. For reasons I'm deciding which are entirely arbitrary.
     modified_request_info["start_time"] = datetime.time(12,00)
     modified_request_info["end_time"] = datetime.time(23,59)
 
@@ -306,13 +312,16 @@ def find_stations(request_info):
             url = makeurl_nr(station, destination, request_info["date"] + timedelta(days = 7) , datetime.time(12,00), arr_flag = False)
             urls.append(url); origins.append(station); destinations.append(destination)
 
-        pages = asyncio.run(scrape_new(urls))
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        pages = loop.run_until_complete(scrape_new(urls))
+        loop.close()
 
         #Pages for all the journeys. Doeesn't matter which order they arrive (lovely)
         alliswell = True
         for page in pages:
             if len(page) == 118:
-                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a couple of minutes.')
+                #print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a couple of minutes.')
                 alliswell = False
 
         if alliswell:
@@ -345,7 +354,7 @@ def find_stations(request_info):
 
         else:
             #Back off and let national rail recover...
-            time.sleep(120.0 + 10.*random.uniform(0,1))
+            time.sleep(60.0 + 10.*random.uniform(0,1))
 
         #If all is well, figure out journey times etc. at this point from the raw html
 
@@ -360,7 +369,7 @@ def find_stations(request_info):
                 t0 = dt.strptime(journey["dep_time"], "%H%M")
                 t1 = dt.strptime(journey["arr_time"], "%H%M")
                 mintime = min(mintime, abs(t1 - t0).total_seconds()/60)
-                maxtime = max(mintime, abs(t1 - t0).total_seconds()/60)
+                maxtime = max(maxtime, abs(t1 - t0).total_seconds()/60)
                 minprice = min(minprice, journey["price"])
             if journey['origin'] == origin:  #This is the first split
                 station_data[journey['destination']]['time1'] = mintime
@@ -377,7 +386,6 @@ def find_stations(request_info):
     #Use this data to determine the final station data (filter out impossible ones and things, and give some kind of scores. Time score plus price score (both to be minimised?)
     final_station_data = {}
     for station in station_data:
-        #print(station_data[station])
         if 'time1' in station_data[station] and 'time2' in station_data[station]:
             #This appears to be a valid option
             time_score = station_data[station]['time1'] + station_data[station]['time2'] - reftime
@@ -391,127 +399,6 @@ def find_stations(request_info):
             price_score = np.abs(station_data[station]['price1'])
             final_station_data[station] = {"time_score":time_score, "price_score":price_score, "in_time":station_data[station]['time1'], "out_time":0.0,"deviation":station_data[station]['deviation'], "progress":station_data[station]['progress']}
 
-    with open(filename, "w") as f:
-        json.dump(final_station_data, f)
-    #We're using alljourneys here ONLY to rank the stations with rough prices, and don't actually care about whether these journeys are doable. That comes later. So for now this is probably fine to be as-is.
-    #It might be worth changing the parameters here to be a generic midday time or something? Actually, let's just do that. In a minute.
-    return final_station_data
-
-def find_station_info(request_info):
-
-    origin = request_info['origin']
-    destination = request_info['destination']
-    filename = "./station_data/%s_%s.json" % (origin, destination)
-    ignore_previous = request_info.get("ignore_previous",False)
-    nesting_degree = request_info.get("nesting_degree", 0)
-    #Create folder if necessary
-    Path("station_data").mkdir(parents=True, exist_ok=True)
-    #Initially check if a file for this combination already exists, and if so use that
-    if os.path.exists(filename) and not ignore_previous:
-        try:
-            with open(filename) as f:
-                station_data = json.load(f)
-            return station_data
-        except:
-            print('File is corrupted or something. Ignoring it and running the search again...')
-
-    #This should be roughly similar for the same pair of stations each time, so can probably be cached or equivalent. It's certainly quite slow :(
-
-    max_deviation = request_info.get("max_deviation",0.5)   #How far off the route to go. Some can really get quite improbable so it's worth setting this quite high...
-    all_station_data = json.loads(open('./station_info.json').read())
-    station_data = {}; station_list = []
-    x0 = (all_station_data[origin]['latitude'], all_station_data[origin]['longitude']); x2 = (all_station_data[destination]['latitude'], all_station_data[destination]['longitude'])
-    dref = geodesic(x0, x2).miles
-    print('Loaded', len(all_station_data), 'stations initially')
-    for station in all_station_data:
-        add_station = True   #Only add this to the final list if it satisfies various requirements
-        x1 = (all_station_data[station]['latitude'], all_station_data[station]['longitude'])
-        d0 = geodesic(x0, x1).miles; d1 = geodesic(x1, x2).miles
-        all_station_data[station]["deviation"] = (d0 + d1)/dref - 1.   #Extra distance to go via this station
-        all_station_data[station]["progress"] = (dref**2 + d0**2 - d1**2)/(2*dref**2)  #Proportion of the progress to the destination station by visiting here. A bit nuanced I think as to what's best here.
-        if all_station_data[station]["deviation"] > max_deviation:
-            add_station = False
-        if add_station:
-            station_data[station] = all_station_data[station]
-            station_list.append(station)
-    print('Looking at', len(station_list), 'stations after geographical filtering. Now to look at timings and prices. This is more tricky.')
-
-    alljourneys = []
-    #Separate this out into lumps
-    if nesting_degree == 0:
-        nrequests_max = 100
-    else:
-        nrequests_max = 10
-    nlumps = int(len(station_list)/(nrequests_max/2) + 1)
-    nrequests_actual = len(station_list)/nlumps + 1
-    modified_request_info = request_info.copy()
-    modified_request_info["date"] = request_info["date"] + timedelta(days = 10)   #Look a week ahead of the actual request time. For reasons I'm deciding which are entirely arbitrary.
-    modified_request_info["start_time"] = datetime.time(9,00)
-    modified_request_info["end_time"] = datetime.time(23,59)
-    for lump in range(nlumps):
-        threads = []; lumpcount = 0
-        minstat = int(nrequests_actual*lump); maxstat = int(min(nrequests_actual*(lump+1), len(station_list)))
-        for station in station_list[minstat:maxstat]:  #Alas this bit needs some multithreading, as it's far too slow.
-            lumpcount += 1
-            #Let's do a basic search and see how long it takes. Do first section and second section separately. Hopefully not too long for a reasonably small list.
-            input_parameters_first = modified_request_info.copy()   #All timing stuff is the same to begin with.
-            input_parameters_first["destination"] = station
-            input_parameters_first["start_only"] = True
-
-            input_parameters_second = modified_request_info.copy()   #All timing stuff is the same to begin with.
-            input_parameters_second["origin"] = station
-            input_parameters_second["start_only"] = True
-
-            x = threading.Thread(target=find_basic_info, args=(input_parameters_first, alljourneys), daemon = False)
-            threads.append(x)
-            x.start()
-
-            x = threading.Thread(target=find_basic_info, args=(input_parameters_second, alljourneys), daemon = False)
-            threads.append(x)
-            x.start()
-
-        for j, x in enumerate(threads):
-            x.join()
-
-        print('%d percent of stations checked...' % (100*maxstat/len(station_list)))
-    reftime = 0
-    for journeys in alljourneys:
-        if len(journeys) > 0:
-            mintime = 1e6; minprice = 1e6; maxtime = 0.
-            for journey in journeys:
-                t0 = dt.strptime(journey["dep_time"], "%H%M")
-                t1 = dt.strptime(journey["arr_time"], "%H%M")
-                mintime = min(mintime, abs(t1 - t0).total_seconds()/60)
-                maxtime = max(mintime, abs(t1 - t0).total_seconds()/60)
-                minprice = min(minprice, journey["price"])
-            if journey['origin'] == origin:  #This is the first split
-                station_data[journey['destination']]['time1'] = mintime
-                station_data[journey['destination']]['price1'] = minprice
-            else:
-                station_data[journey['origin']]['time2'] = mintime
-                station_data[journey['origin']]['price2'] = minprice
-            if journey['origin'] == origin and journey['destination'] == destination:
-                station_data[journey['origin']]['time1'] = mintime
-                station_data[journey['origin']]['price1'] = minprice
-                reftime = max(reftime, maxtime)
-            #Set the reference time if it is both. This is a bit ugly but can't really be helped
-
-    #Use this data to determine the final station data (filter out impossible ones and things, and give some kind of scores. Time score plus price score (both to be minimised?)
-    final_station_data = {}
-    for station in station_data:
-        #print(station_data[station])
-        if 'time1' in station_data[station] and 'time2' in station_data[station]:
-            #This appears to be a valid option
-            time_score = station_data[station]['time1'] + station_data[station]['time2'] - reftime
-            price1 = np.abs(station_data[station]['price1']/station_data[station]['progress'])
-            price2 = np.abs(station_data[station]['price2']/(1.0 - station_data[station]['progress']))
-            price_score = min(price1, price2)
-            final_station_data[station] = {"time_score":time_score, "price_score":price_score, "in_time":station_data[station]['time1'], "out_time":station_data[station]['time2'], "deviation":station_data[station]['deviation'], "progress":station_data[station]['progress']}
-        elif station == destination and 'time1' in station_data[station]:
-            #This is the whole journey (not the splits), which contains useful information so may as well put it in. Also useful for normalising the prices, which I'll do shortly.
-            time_score = station_data[station]['time1'] - reftime
-            price_score = np.abs(station_data[station]['price1'])
-            final_station_data[station] = {"time_score":time_score, "price_score":price_score, "in_time":station_data[station]['time1'], "out_time":0.0,"deviation":station_data[station]['deviation'], "progress":station_data[station]['progress']}
     with open(filename, "w") as f:
         json.dump(final_station_data, f)
     #We're using alljourneys here ONLY to rank the stations with rough prices, and don't actually care about whether these journeys are doable. That comes later. So for now this is probably fine to be as-is.

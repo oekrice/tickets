@@ -1,4 +1,4 @@
-from obtain_data import find_basic_info, find_stations, find_station_info
+from obtain_data import find_basic_info, find_stations
 import threading
 import numpy as np
 from datetime import datetime as dt, timedelta
@@ -25,7 +25,7 @@ def rank_stations(request_info, station_info, rank_type):
 
     times = []; prices = []; stats= []
     for station in station_info:
-        #Filter stations based on the timing above. Need a hard cutoff here which will actually reduce as the constraints become more extreme.
+        #Filter stations based on the timing above. Need a hard cutoff here which will actually reduce as the constraints become more extreme, so it should complete in logarithmic time.
         local_start_time = t0 + station_info[station]["in_time"]
         local_end_time = t1 - station_info[station]["out_time"]
         if rank_type == 1:
@@ -35,11 +35,11 @@ def rank_stations(request_info, station_info, rank_type):
                 times.append(station_info[station]["time_score"])
                 stats.append([station, local_start_time, local_end_time])
         else:
-            if (local_start_time <=  local_end_time) and (station_info[station]["in_time"] + station_info[station]["out_time"] < max_time) and station != request_info["destination"] and station_info[station]["progress"] < 0.75 and station_info[station]["progress"] > 0.25:
+            if (local_start_time <=  local_end_time) and (station_info[station]["in_time"] + station_info[station]["out_time"] < max_time) and station != request_info["destination"] and station_info[station]["progress"] < 0.85 and station_info[station]["progress"] > 0.15:
                 #Sort the stations based on the above
                 #ONLY KEEP ONES ENROUTE
                 
-                if station_info[station]["time_score"] <= 0.:   #Only enroute or very close to it
+                if station_info[station]["time_score"] <= 5.:   #Only enroute or close to it
                     prices.append(station_info[station]["price_score"])
                     times.append(station_info[station]["time_score"])
                     stats.append([station, local_start_time, local_end_time])
@@ -322,7 +322,7 @@ def find_first_splits(request_info, station_checks):
             alljourneys[-1]["id"] = id_count
             id_count += 1
 
-    #Find combinations of these which work. 
+    #Find combinations of these which work. Would like to put a time limit in here, ideally, but not sure where to obtain such information. Maybe just not do this for now. Yes.
     print('All trains found. Finding valid combinations.')
     splits = []
     for i1, j1 in enumerate(alljourneys):
@@ -372,6 +372,34 @@ def filter_splits(request_info, unfiltered_splits):
     local_matrix = price_matrix.copy() 
     minprice = 1e6; maxprice = 0
     mintime = 1e6
+    # direct_matrix = price_matrix.copy()
+
+    # #Determine the basic matrix of possible times, so impossible times don't get unduly prioritised (but not disregarded entirely)
+    # for split in unfiltered_splits:
+        
+    #     t0 = dt.strptime(split["dep_time"], "%H%M")
+    #     t1 = dt.strptime(split["arr_time"], "%H%M")
+    #     jtime = abs(t1 - t0).total_seconds()/3600   #Number of hours
+    #     mintime = min(mintime, jtime)
+    #     #Check if this split is an optimal one (so far!), and if so update the matrix for it.
+    #     xbin = np.digitize(t0.hour  + t0.minute/60, xs) - 1
+    #     ybin = np.digitize(jtime, ys) - 1
+    #     maxprice = max(split["price"], maxprice)
+    #     minprice = min(split["price"], minprice)
+    #     if split["price"] < direct_matrix[xbin,ybin] and len(split["split_stations"]) == 0:
+    #         spreadmin = max(0, xbin-spread_bins); spreadmax = min(xbin+spread_bins,len(xs))
+    #         #Update the price matrix here. Don't want loops but might have to have them... Bugger.
+    #         local_matrix[spreadmin:spreadmax+1,ybin] = split["price"]
+    #         local_matrix[spreadmin:spreadmax+1,ybin+1:] = split["price"] - 0.005  #Don't bother with ones which are exactly the same price
+    #         #Update for journeys which left earlier but took longer (arriving at the same time or later)
+    #         for c, i in enumerate(range(xbin-1, -1, -1)):
+    #             if ybin + c < len(ys):
+    #                 local_matrix[i,ybin+c+1:] = split["price"] - 0.005
+    #         direct_matrix = np.minimum(direct_matrix, local_matrix)
+    #         local_matrix[:,:] = 1e6
+
+    # local_matrix = price_matrix.copy() 
+
     for split in unfiltered_splits:
         
         t0 = dt.strptime(split["dep_time"], "%H%M")
@@ -383,7 +411,7 @@ def filter_splits(request_info, unfiltered_splits):
         ybin = np.digitize(jtime, ys) - 1
         maxprice = max(split["price"], maxprice)
         minprice = min(split["price"], minprice)
-        if split["price"] < price_matrix[xbin,ybin]:
+        if split["price"] < price_matrix[xbin,ybin]:  #Only update if this is possible directly, or may unfairly prioritise impossible splits.
             spreadmin = max(0, xbin-spread_bins); spreadmax = min(xbin+spread_bins,len(xs))
             #Update the price matrix here. Don't want loops but might have to have them... Bugger.
             local_matrix[spreadmin:spreadmax+1,ybin] = split["price"]
@@ -394,7 +422,6 @@ def filter_splits(request_info, unfiltered_splits):
                     local_matrix[i,ybin+c+1:] = split["price"] - 0.005
             price_matrix = np.minimum(price_matrix, local_matrix)
             local_matrix[:,:] = 1e6
-
 
     maxprice = 0
     xmin = 1e6; xmax = 0
@@ -416,12 +443,24 @@ def filter_splits(request_info, unfiltered_splits):
             maxprice = max(maxprice, split["price"])
             #Update the price matrix here. Don't want loops but might have to have them... Bugger.
             filtered_splits.append(split)
-            price_matrix[xbin,ybin] -= 0.005   #Don't add a split with the same price here. Just keep the first one.
+            price_matrix[xbin,ybin] -= 0.005   #Don't add a split with the same price here. Just keep the first one you see.
             plt.scatter(t0.hour  + t0.minute/60, jtime, c = 'red', zorder = 10, edgecolors = 'black')
             xmin = min(xmin, t0.hour  + t0.minute/60); xmax = max(xmax, t0.hour  + t0.minute/60)
             ymin = min(ymin, jtime); ymax = max(ymax, jtime)
+
     price_matrix[price_matrix > 1e5] = maxprice
     if False:
+        fig = plt.figure()
+        plt.xticks(range(0,24))
+        plt.yticks(range(0,24))
+        plt.xlim(xmin,xmax)
+        plt.ylim(ymin-0.5,ymax+0.5)
+        plt.pcolormesh(xs, ys, direct_matrix.T)
+        plt.colorbar()
+        plt.savefig('plots/plot1.png')
+        plt.close()
+
+        fig = plt.figure()
         plt.xticks(range(0,24))
         plt.yticks(range(0,24))
         plt.xlim(xmin,xmax)
