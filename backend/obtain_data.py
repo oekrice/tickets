@@ -129,7 +129,7 @@ def find_basic_info(input_parameters, alljourneys = []):
             tree = html.fromstring(page)
 
             if len(page) == 118:
-                #print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a bit and trying again.')
+                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a bit and trying again.')
                 time.sleep(60.0 + 10.*random.uniform(0,1))
                 success = False
                 start_times = start_times_current.copy()
@@ -321,7 +321,7 @@ def find_stations(request_info):
         alliswell = True
         for page in pages:
             if len(page) == 118:
-                #print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a couple of minutes.')
+                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a couple of minutes.')
                 alliswell = False
 
         if alliswell:

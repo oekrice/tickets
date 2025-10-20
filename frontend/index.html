@@ -170,7 +170,7 @@
                         }
                         document.getElementById("status-container").innerHTML = resultInfo;
                     } else {                             
-                        resultInfo = 'Request failed for some reason. Try something else?'
+                        resultInfo = 'The code might still be running, or the scraper may have been thwarted. Wait and see I guess...'
                         document.getElementById("status-container").innerHTML = resultInfo;
                         console.error("Request failed with status:", response.status);
                     }
