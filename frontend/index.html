@@ -39,9 +39,18 @@
         <button onclick=getTrains(0)>Get 'direct' trains</button>
         <button onclick=getTrains(1)>Get basic split tickets</button>
         <button onclick=getTrains(2)>Get detailed split tickets</button>
-
+    </div>
     <hr>
     <div id="status-container"></div>
+    <div id="sort-options">
+        <p> Sort results by: <br>
+        <button onclick=sortTrains(0)>Departure Time</button>
+        <button onclick=sortTrains(1)>Price</button>
+        <button onclick=sortTrains(2)>Journey Time</button>
+        <button onclick=sortTrains(3)>Value</button>
+        </p>
+    </div>
+
     <div id="result-container"></div>
     <table id="outputTable" style="display:none" >
         <tr>
@@ -64,9 +73,79 @@
     let trainDataRaw, trainData, existingData
     let stationData
     let detailFlag = false
-    trainData = []
+    if (trainData == null){
+        trainData = []
+    }
     //Update default parameters in the search bar (date etc.) and obtain the list of allowed stations
-    getDefaults();
+    document.getElementById("sort-options").style.display = "none"
+    getDefaults();  
+
+    async function loadTest() {
+    const response = await fetch('./testdata.json');
+    const data = await response.json();
+    return data;
+    }
+
+    //THIS IS FOR TESTING -- COMMENT OUT TO USE NORMALLY
+    loadTest().then(data => {
+        trainData = data;
+        console.log('datalength a', trainData.length)
+
+        makeResultTable(trainData)
+        document.getElementById("outputTable").style.display = "block"
+        document.getElementById("sort-options").style.display = "block";
+    
+    })
+
+    function sortTrains(sortOption){
+        //Sorts the results in place based on the selected option 
+        //Either departure time (the default), price or a made up 'value' function
+        console.log('Sorting with option', sortOption, trainData.length)
+        var sortValues = []
+        if (sortOption == 0){
+            //This is departure time. Make an array of the values to be sorted
+            //Want to sort by arrival time first, for reasons
+        for (let i = 0; i < trainData.length; i ++){
+            sortValues.push(parseFloat(trainData[i].arr_time))
+        }
+
+        const paired = trainData.map((item, i) => [item, sortValues[i]]);
+        paired.sort((a, b) => a[1] - b[1]);
+        trainData = paired.map(pair => pair[0]);
+
+        var sortValues = []
+
+        for (let i = 0; i < trainData.length; i ++){
+            sortValues.push(parseFloat(trainData[i].dep_time))
+        }
+        } else if (sortOption == 1) {
+            //This is price. Make an array of the values to be sorted
+            for (let i = 0; i < trainData.length; i ++){
+                sortValues.push(parseFloat(trainData[i].price))
+        } 
+        } else if (sortOption == 2) {
+            for (let i = 0; i < trainData.length; i ++){
+                let journeyTime = findJourneyTime(trainData[i].dep_time, trainData[i].arr_time)
+                console.log(journeyTime)
+                sortValues.push(journeyTime)
+        }
+        } else if (sortOption == 3) {
+            for (let i = 0; i < trainData.length; i ++){
+                let journeyTime = findJourneyTime(trainData[i].dep_time, trainData[i].arr_time)
+                let journeyMinutes = journeyTime.getUTCMinutes() + journeyTime.getUTCHours()*60
+                let value = trainData[i].price + 10.0*journeyMinutes/60
+                console.log(journeyTime)
+                sortValues.push(value)
+        }
+        }
+        
+        const paired = trainData.map((item, i) => [item, sortValues[i]]);
+        paired.sort((a, b) => a[1] - b[1]);
+        trainData = paired.map(pair => pair[0]);
+        console.log(trainData)
+        makeResultTable(trainData);
+
+    }
 
     async function getTrains(requestStatus) {
         //Send the parameters to Python and wait for a response...
@@ -111,6 +190,7 @@
                     } else {
                         resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
                         document.getElementById("outputTable").style.display = "block";
+                        document.getElementById("sort-options").style.display = "block";
                     }
                     document.getElementById("status-container").innerHTML = resultInfo;
 
@@ -165,11 +245,13 @@
                         } else if (trainData.length > 0) {
                             resultInfo = 'Still finding trains... Currently found ' + trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
                             document.getElementById("outputTable").style.display = "block";
+                            document.getElementById("sort-options").style.display = "block";
                         document.getElementById("status-container").innerHTML = resultInfo;
                             makeResultTable(trainData)
                         } else if (trainData.length == 0 && existingData.length > 0) {   //This is done now. Just leave it as is if possible.
                             resultInfo = 'Finished. ' + existingData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
                             document.getElementById("outputTable").style.display = "block";
+                            document.getElementById("sort-options").style.display = "block";
                         }
                         document.getElementById("status-container").innerHTML = resultInfo;
                     } else {                             
@@ -248,18 +330,7 @@
             document.getElementById('station-list').innerHTML = options;
         })
 
-        async function loadTest() {
-        const response = await fetch('./testdata.json');
-        const data = await response.json();
-        return data;
-        }
 
-        //THIS IS FOR TESTING -- COMMENT OUT TO USE NORMALLY
-        loadTest().then(trainData => {
-            trainData;
-            makeResultTable(trainData)
-            document.getElementById("outputTable").style.display = "block"
-        })
 
 
     }
@@ -417,7 +488,7 @@
             document.getElementById("status-container").innerHTML = "Arrival time must be after departure time.";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
-            trainData = []
+            document.getElementById("sort-options").style.display = "none";
             return;
         }
 
@@ -431,6 +502,7 @@
                 document.getElementById("status-container").innerHTML = "Departure time must not be in the past.";
                 document.getElementById("result-container").innerHTML = "";
                 document.getElementById("outputTable").style.display = "none";
+                document.getElementById("sort-options").style.display = "none";
                 return
             }
         }
@@ -439,16 +511,17 @@
             document.getElementById("status-container").innerHTML = "Finding direct tickets only...";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
-            trainData = []
+            document.getElementById("sort-options").style.display = "none";
         } else if (requestStatus == 1){
             document.getElementById("status-container").innerHTML = "Finding single split tickets. <br> Should take up to 5 minutes but may occasionally be longer.";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
-            trainData = []
+            document.getElementById("sort-options").style.display = "none";
         } else if (checkNumber == 0) {
             document.getElementById("status-container").innerHTML = "Finding detailed split tickets. <br> This may take up to half an hour or so but the results below will update as it goes."
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
+            document.getElementById("sort-options").style.display = "none";
         }
         
         //If it's got this far, there are at least origin and destination stations
