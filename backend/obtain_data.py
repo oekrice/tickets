@@ -12,7 +12,59 @@ from pathlib import Path
 import asyncio 
 import aiohttp
 import random
+from bs4 import BeautifulSoup
 #This is for obtaining the data
+
+
+def station_inout(stations, date):
+    """
+    Using brtimes.org (which seems quite a lovely website to scrape), gives the minimum connection time and a list of trains departing that day
+    May be easier to use their api, but should be OK as long as I integrate it with the multiprocessing stuff
+    """"2025-10-27"
+    date_formatted = date.strftime("%Y-%m-%d")
+
+    def makeurl_rtt(station, date):
+
+        """
+        Generates the url used to scrape from brtimes
+        """
+        s1 = "https://www.realtimetrains.co.uk/search/detailed/gb-nr:"
+        s2 = "/"
+        s3 = "/0000-2359?stp=WVS&show=pax-calls&order=wtt"
+        return s1 + station + s2 + date + s3
+
+    async def fetch(sem, session, url):
+        async with sem:
+            async with session.get(url, timeout = 15.0) as response: #This can get stuck. Not sure how to fix that yet but the internet will know.
+                return await response.text()
+
+    async def scrape_new(urls):
+        sem = asyncio.Semaphore(1)
+        connector = aiohttp.TCPConnector(limit=1)
+        async with aiohttp.ClientSession(connector = connector) as session:
+            tasks = [fetch(sem, session, url) for url in urls]
+            pages = await asyncio.gather(*tasks)
+        return pages
+
+    urls = []
+    for station in stations:
+        urls.append(makeurl_rtt(station, date_formatted))
+
+    pages = asyncio.run(scrape_new(urls))
+
+    inouts = {}
+    for pi, page in enumerate(pages):
+        station = stations[pi]
+        soup = BeautifulSoup(page, "html.parser")
+        # find all planned GBTT times (arrival or departure)
+        services = soup.select("a.service")
+        pairs = []
+        for si, service in enumerate(services):
+            if service.select_one("div.time.plan.a.gbtt") is not None and service.select_one("div.time.plan.d.gbtt") is not None:
+                pairs.append([float(service.select_one("div.time.plan.a.gbtt").text.strip()), float(service.select_one("div.time.plan.d.gbtt").text.strip())])
+        inouts[station] = pairs
+    
+    return inouts
 
 def makeurl_nr(origin, destination, date_search, page_start_time, arr_flag = False):
     s1 = "https://ojp.nationalrail.co.uk/service/timesandfares/"
@@ -87,7 +139,7 @@ def find_basic_info(input_parameters, alljourneys = []):
             "Connection": "keep-alive",
         }
         async with sem:
-            async with session.get(url, headers=headers, timeout = 10.0) as response:
+            async with session.get(url, headers=headers, timeout = 15.0) as response:
                 return await response.text()
 
     async def scrape_new(urls):
@@ -137,11 +189,24 @@ def find_basic_info(input_parameters, alljourneys = []):
 
             else:
                 #Don't need to back off, just go for it as is.'
-                wait_time = 60.0
-
+                wait_time = 120.0
                 dep = tree.xpath('//div[@class="dep"]/text()')
                 arr = tree.xpath('//div[@class="arr"]/text()')
                 price = tree.xpath('//label[@class="opsingle"]/text()')
+                zerochanges = tree.xpath('//div[@class="chg"]/text()')
+
+                nonzerochanges = tree.xpath('//div[@class="chg"]//a[@class="changestip-link"]/text()')
+
+                nchanges = []
+                i0 = 0; i1 = 0   #Those which have a link occupy two items in this, which will map to a single item in the second list
+                for i in range(len(dep)): #This length is at least reliable.
+                    if zerochanges[i0][0].isnumeric():   #No changes -- carry on
+                        nchanges.append(0)
+                        i0 += 1
+                    else:  #Is at least one change here
+                        nchanges.append(int(nonzerochanges[i1][0]))
+                        i0 += 2
+                        i1 += 1
 
                 if stop_flags[pi] == 0:  #Don't bother if it's already there...
                     if len(dep) > 0 and len(price) == len(dep)*2:
@@ -160,9 +225,9 @@ def find_basic_info(input_parameters, alljourneys = []):
                                 p1 = float(price[i*2 + 1].strip()[1:])
                                 if not start_only and not end_only:
                                     if dep1 >= start_times_current[pi] and arr1 <= t_end and arr1 > dep1 and arr1 > start_times_current[pi] and dep1 <= t_end:
-                                        journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1, 'split_stations':[], 'split_arrs':[], 'split_deps':[], 'split_prices':[p1]})
+                                        journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1, 'split_stations':[], 'split_arrs':[], 'split_deps':[], 'split_prices':[p1], 'nchanges': nchanges[i]})
                                 else:
-                                    journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1,      'split_stations':[], 'split_arrs':[], 'split_deps':[],'split_prices':[p1]})
+                                    journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1,      'split_stations':[], 'split_arrs':[], 'split_deps':[],'split_prices':[p1], 'nchanges': nchanges[i]})
                         #Check for reasons to stop -- if search has gone into tomorrow or exceeded the local end
                         proceed = True  #Proceed unless there's reason not to...
                         if arr1 < overall_start_time or dep1 > local_end or maxarr > t_end:
@@ -191,7 +256,7 @@ def find_basic_info(input_parameters, alljourneys = []):
         if success:
             startcount += 1
 
-        if startcount > 20:  #Something has gone terribly wrong... Abort. Can happen if stations are actually in the same place.
+        if startcount > 20:  #Something has gone terribly wrong... Abort. Can happen too if stations are actually in the same place.
             go = False
     #print('Waves of requests:', startcount)
     unique_journeys = []; seen = set()
@@ -262,7 +327,7 @@ def find_stations(request_info):
             "Connection": "keep-alive",
         }
         async with sem:
-            async with session.get(url, headers=headers, timeout = 5.0) as response: #This can get stuck. Not sure how to fix that yet but the internet will know.
+            async with session.get(url, headers=headers, timeout = 15.0) as response: #This can get stuck. Not sure how to fix that yet but the internet will know.
                 return await response.text()
 
     async def scrape_new(urls):

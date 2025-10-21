@@ -1,4 +1,4 @@
-from obtain_data import find_basic_info, find_stations
+from obtain_data import find_basic_info, find_stations, station_inout
 import threading
 import numpy as np
 from datetime import datetime as dt, timedelta
@@ -68,135 +68,6 @@ def rank_stations(request_info, station_info, rank_type):
             basic_list.append(timelist[i][0])
 
     return final_list
-
-def find_journeys(request_info, splits = []):
-    #This function is for finding journeys GENERALLY. The degree to how in-depth this is is given in request_info
-    #A degree of 0 will just find the NR ones etc., and things can go from there to be more in-depth.
-    #Each set of requests will check both those at this level and that BELOW (if appropriate). Thus can very much be circular.
-    #Requires station checks to be done here or things will get lost...
-    #print('Request logged', request_info)
-    #If request info is greater than 0, need to do station checks
-    nesting_degree = request_info.get("nesting_degree", 0)
-    if request_info["request_depth"] > 0:
-        #Need to do additional admin if there's more to it than a basic check
-        station_info = find_station_info(request_info)   #This will attempt to rank the stations in the request based on geography, THEN other things like timing and price (which will take a request).
-        station_checks = rank_stations(request_info, station_info)   #Need to be smarter with this, and just not check those where the timings are off. Can get a tmin and tmax for each station too, based on this particular request.
-        nchecks_init = request_info.get("nchecks_init", 20)
-        print(request_info["request_depth"], nesting_degree)
-        if nesting_degree > 0:
-            nrequests_max = 1  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
-            nchecks_init = int(nchecks_init//10) + 1 #Seems reasonable for extreme checks
-        elif request_info["request_depth"] == 1 and nesting_degree == 0:
-            nrequests_max = 50
-        else:
-            nrequests_max = 20
-
-        allchecks = station_checks[:nchecks_init]
-
-        print('Checking ', nchecks_init, ' stations between', request_info["origin"], 'and', request_info["destination"] )
-        individual_journeys = []
-
-        if len(allchecks) > 0:
-            nlumps = int(len(allchecks)/(nrequests_max/2) + 1)
-            if nlumps == 2:
-                nlumps = 1 #This is usually actually what you want
-            nrequests_actual = len(allchecks)/nlumps + 1
-
-            for lump in range(nlumps):
-                threads = []; lumpcount = 0
-                minstat = int(nrequests_actual*lump); maxstat = int(min(nrequests_actual*(lump+1), len(allchecks)))
-
-                if lump == 0:
-                    #Do the basic check on direct journeys at the degree below this one
-                    input_parameters = request_info.copy()   #All timing stuff is the same to begin with.
-                    input_parameters["request_depth"] = input_parameters["request_depth"] - 1
-                    input_parameters["nesting_degree"] = nesting_degree + 1
-                    x = threading.Thread(target=find_journeys, args=(input_parameters, individual_journeys), daemon = False)
-                    threads.append(x)
-                    x.start()
-
-                for station in allchecks[minstat:maxstat]:  #Alas this bit needs some multithreading, as it's far too slow.
-                    #Let's do a basic search and see how long it takes. Do first section and second section separately. Hopefully not too long for a reasonably small list.
-                    input_parameters_first = request_info.copy()   #All timing stuff is the same to begin with.
-                    input_parameters_first["request_depth"] = input_parameters_first["request_depth"] - 1
-                    input_parameters_first["nesting_degree"] = nesting_degree + 1
-                    input_parameters_first["destination"] = station[0]
-                    input_parameters_first["end_time"] = time(hour = int((station[2] + 5)//60), minute = int((station[2] + 5)%60))
-
-                    input_parameters_second = request_info.copy()   #All timing stuff is the same to begin with.
-                    input_parameters_second["request_depth"] = input_parameters_second["request_depth"] - 1
-                    input_parameters_second["nesting_degree"] = nesting_degree + 1
-
-                    input_parameters_second["origin"] = station[0]
-                    input_parameters_second["start_time"] = time(hour = int((station[1] - 5)//60), minute = int((station[1] - 5)%60))
-
-                    x = threading.Thread(target=find_journeys, args=(input_parameters_first, individual_journeys), daemon = False)
-                    threads.append(x)
-                    x.start()
-
-                    x = threading.Thread(target=find_journeys, args=(input_parameters_second, individual_journeys), daemon = False)
-                    threads.append(x)
-                    x.start()
-
-                for j, x in enumerate(threads):
-                    x.join()
-
-                print('%d percent of stations checked...' % (100*maxstat/len(allchecks)))
-
-        alljourneys = []; id_count = 0
-        #Once these have all completed, save into a nice ordered list and check for reasonable combinations
-        for journey_group in individual_journeys:
-            for journey in journey_group:
-                alljourneys.append(journey)
-                alljourneys[-1]["id"] = id_count
-                id_count += 1
-
-        allsplits = []
-        #Find combinations of these which work.
-        for i1, j1 in enumerate(alljourneys):
-            for i2, j2 in enumerate(alljourneys):
-                if j1["destination"] == j2["origin"] and float(j1["arr_time"]) <= float(j2["dep_time"]):
-                    #This is valid. Combine into a single journey object.
-                    #Determine existing split stations here
-                    allsplits.append({
-                        'origin':j1['origin'], 'destination': j2['destination'],
-                        'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
-                        'price':j1['price'] + j2['price'],
-                        'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
-                        'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
-                        'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
-                        'split_prices':j1["split_prices"] + j2["split_prices"]
-                    })
-            if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
-                    allsplits.append({
-                        'origin':j1['origin'], 'destination': j1['destination'],
-                        'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
-                        'price':j1['price'],
-                        'split_stations':j1['split_stations'],
-                        'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
-                        'split_prices':j1["split_prices"]
-                    })
-
-        #print(len(allsplits),' unfiltered splits found between', request_info["origin"], 'and', request_info["destination"])
-        splits.append(filter_splits(request_info, allsplits))
-
-        print(len(splits[0]), ' journeys found between', request_info["origin"], 'and', request_info["destination"])
-
-        return splits
-    else:
-        individual_journeys = []
-        request_info["nesting_degree"] = nesting_degree
-        #print('REQUEST', request_info)
-        find_basic_info(request_info, alljourneys = individual_journeys)
-        id_count = 0
-        alljourneys = []
-        #Once these have all completed, save into a nice ordered list and check for reasonable combinations
-        for journey_group in individual_journeys:
-            for journey in journey_group:
-                alljourneys.append(journey)
-
-        splits.append(filter_splits(request_info, alljourneys))
-        return splits
 
 def find_second_splits(request_info, station):
     individual_journeys = []
@@ -280,7 +151,10 @@ def find_first_splits(request_info, station_checks):
     nlumps = int(len(allchecks)/(nrequests_max/2) + 1)
     nrequests_actual = len(allchecks)/nlumps + 1
     individual_journeys = []
-    print('Checking ', len(allchecks), ' stations...')
+
+    if len(allchecks) == 0:
+        return {}
+    
     for lump in range(nlumps):
         threads = []; lumpcount = 0
         minstat = int(nrequests_actual*lump); maxstat = int(min(nrequests_actual*(lump+1), len(allchecks)))
@@ -315,39 +189,66 @@ def find_first_splits(request_info, station_checks):
         print('%d percent of stations checked...' % (100*maxstat/len(allchecks)))
 
     alljourneys = []; id_count = 0
+    station_checks = []
     #Once these have all completed, save into a nice ordered list and check for reasonable combinations
     for journey_group in individual_journeys:
         for journey in journey_group:
             alljourneys.append(journey)
             alljourneys[-1]["id"] = id_count
             id_count += 1
-
+            station_check = journey["origin"]
+            if station_check not in station_checks:
+                station_checks.append(station_check)
+    #At this point, determine all the station in/outs which need to be checked to see whether changes are real or not
+    print('Checking changes are possible at', len(station_checks),  'stations')
+    inout_times = station_inout(station_checks, input_parameters_first["date"])
     #Find combinations of these which work. Would like to put a time limit in here, ideally, but not sure where to obtain such information. Maybe just not do this for now. Yes.
     print('All trains found. Finding valid combinations.')
     splits = []
     for i1, j1 in enumerate(alljourneys):
         for i2, j2 in enumerate(alljourneys):
-            if j1["destination"] == j2["origin"] and float(j1["arr_time"]) <= float(j2["dep_time"]):
-                #This is valid. Combine into a single journey object.
-                #Determine existing split stations here
-                splits.append({
-                    'origin':j1['origin'], 'destination': j2['destination'],
-                    'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
-                    'price':j1['price'] + j2['price'],
-                    'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
-                    'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
-                    'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
-                    'split_prices':j1["split_prices"] + j2["split_prices"]
-                })
-        if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
-                splits.append({
-                    'origin':j1['origin'], 'destination': j1['destination'],
-                    'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
-                    'price':j1['price'],
-                    'split_stations':j1['split_stations'],
-                    'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
-                    'split_prices':j1["split_prices"]
-                })
+            if j1["destination"] == j2["origin"]:
+
+                change_time = 0.0   #Assume this isn't a change unless otherwise informed (if it doesn't appear in an otherwise-populated list)
+                nchange_add = 0
+                if len(inout_times[j1["destination"]]) > 0:
+                    if [float(j1["arr_time"]), float(j2["dep_time"])] in inout_times[j1["destination"]]:
+                        #Probably direct
+                        change_time = 0.0
+                    else:
+                        change_time = 5.0
+                        nchange_add = 1
+
+                #Alas at this point it's probably not worth changing to datetimes and back, so just do a mod bodge
+                if float(j2["dep_time"])%100 < change_time:
+                    latest_arrival = float(j2["dep_time"]) - 100 + 60 - change_time
+                else:
+                    latest_arrival = float(j2["dep_time"]) - change_time
+
+                if float(j1["arr_time"]) <= latest_arrival:
+                    #This is potentially valid. Combine into a single journey object.
+                    #Determine existing split stations here.
+
+                    #Check whether this is a change or not -- that's quite important as to whether it's valid.
+                    #Worst case scenario is that this is misidentified and you get an impossible change or two.
+                    splits.append({
+                        'origin':j1['origin'], 'destination': j2['destination'],
+                        'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
+                        'price':j1['price'] + j2['price'],
+                        'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
+                        'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
+                        'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
+                        'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add
+                    })
+                if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
+                        splits.append({
+                            'origin':j1['origin'], 'destination': j1['destination'],
+                            'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
+                            'price':j1['price'],
+                            'split_stations':j1['split_stations'],
+                            'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
+                            'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"]
+                        })
 
 
     return splits

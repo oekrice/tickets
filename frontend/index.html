@@ -49,6 +49,7 @@
             <th>Arrives</th>
             <th>Price</th>
             <th>Journey Time</th>
+            <th>Changes</th>
         </tr>
     </table>
 
@@ -100,6 +101,8 @@
                     trainData = JSON.parse(trainDataRaw)  //Object containing the train outputs
                     xmlDoc = parser.parseFromString(trainDataRaw,"text/xml")
                     //At this point trigger a function to enable the HTML to make a nice table of the results
+
+                    console.log(trainData)
                     makeResultTable(trainData)
 
                     //If no results found, say as much and don't display the table
@@ -124,7 +127,7 @@
             }
 
         } else {
-            document.getElementById("status-container").innerHTML = "Attempting a loop thing"
+            document.getElementById("status-container").innerHTML = "Attempting continual updates."
             //Send initial request as per?
             let i = 0
             let resultInfo 
@@ -216,7 +219,6 @@
         let threehours = new Date();
         fivemins.setMinutes(fivemins.getMinutes() + 15)
         threehours.setMinutes(threehours.getMinutes() + 180)
-        console.log(threehours)
         let todayString = today.toISOString().split('T')[0];
         let timeString = String(fivemins.getHours()).padStart(2,'0') + ":" + String(fivemins.getMinutes()).padStart(2,'0')
         document.getElementById('date-input').value = todayString;
@@ -245,6 +247,20 @@
             }
             document.getElementById('station-list').innerHTML = options;
         })
+
+        async function loadTest() {
+        const response = await fetch('./testdata.json');
+        const data = await response.json();
+        return data;
+        }
+
+        //THIS IS FOR TESTING -- COMMENT OUT TO USE NORMALLY
+        loadTest().then(trainData => {
+            trainData;
+            makeResultTable(trainData)
+            document.getElementById("outputTable").style.display = "block"
+        })
+
 
     }
 
@@ -283,12 +299,12 @@
         let rows = outputTable.rows;
         let i = rows.length;
         let newRow, newCell, newText;
-        let depTime, arrTime;
+        let depTime, arrTime, nchanges;
         let journeyTime = new Date()
-
         while (--i) {
             outputTable.deleteRow(i)
         }
+
         for (let i = 0; i < trainData.length; i ++){
             newRow = outputTable.insertRow(-1);
 
@@ -314,14 +330,20 @@
             }
             newCell.appendChild(newText);
 
+            nchanges = trainData[i].nchanges;
+            newCell = newRow.insertCell();
+            newText = document.createTextNode(nchanges)
+            newCell.appendChild(newText)
+            //Add the detail boxes
+
             newRow.classList.add('clickable');
 
             let detailsRow = outputTable.insertRow();
             detailsRow.classList.add('details');
             let cell = detailsRow.insertCell();
 
-            cell.colSpan = 4;
-            cell.innerHTML = trainAdditionalInfo(i)
+            cell.colSpan = 5;
+            cell.innerHTML = trainAdditionalInfo(i, trainData)
 
             newRow.addEventListener('click', () => {
                 detailsRow.style.display =
@@ -335,13 +357,12 @@
         }
     }
 
-    function trainAdditionalInfo(trainNumber){
+    function trainAdditionalInfo(trainNumber, trainData){
         //Returns the additional info for the train in nicely formatted html
         //Number of tickets and things. Might need a station lookup?
         let returnString = '<div>'
         let rowString = ''  //For each row. This is a bit tricky to format probably
         const nsplits = trainData[trainNumber].split_stations.length
-
         if (nsplits == 0) {
             returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[0])
         } else {
@@ -420,13 +441,14 @@
             document.getElementById("outputTable").style.display = "none";
             trainData = []
         } else if (requestStatus == 1){
-            document.getElementById("status-container").innerHTML = "Finding single split tickets. May take a while if this is the first time.";
+            document.getElementById("status-container").innerHTML = "Finding single split tickets. <br> Should take up to 5 minutes but may occasionally be longer.";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
             trainData = []
         } else if (checkNumber == 0) {
-            document.getElementById("status-container").innerHTML = "Finding lots of split tickets... May take ages or go terribly wrong, but we'll see."
-            //Don't delete existing train data? Yes, don't. And can put the packages in a loop maybe? Can try this with console. 
+            document.getElementById("status-container").innerHTML = "Finding detailed split tickets. <br> This may take up to half an hour or so but the results below will update as it goes."
+            document.getElementById("result-container").innerHTML = "";
+            document.getElementById("outputTable").style.display = "none";
         }
         
         //If it's got this far, there are at least origin and destination stations

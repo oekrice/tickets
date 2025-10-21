@@ -6,7 +6,7 @@ import json
 from flask_cors import CORS
 import time
 from obtain_data import find_basic_info, find_stations
-from data_functions import rank_stations, find_first_splits, find_second_splits, find_journeys, find_second_splits, filter_splits
+from data_functions import rank_stations, find_first_splits, find_second_splits, find_second_splits, filter_splits
 from datetime import datetime as dt, timedelta
 from pathlib import Path
 import sys
@@ -75,7 +75,7 @@ def trains():
                             "request_depth":1
                             }
 
-        elif input_data['requestStatus'] == 2:  #Look for more splits. Now depends on a status.
+        elif input_data['requestStatus'] == 2:  #Look for more splits. Now depends on a status so it can update in due course.
             request_info = {"origin": origin,
                             "destination": destination,
                             "date": date,
@@ -140,7 +140,10 @@ def trains():
                 print(len(alljourneys), ' valid journeys after filtering stage 2')
 
                 return_data = alljourneys
-                                    
+
+        with open('testdata.json', "w") as f:
+            json.dump(return_data, f)
+      
         return flask.Response(response=json.dumps(return_data), status=201, mimetype='application/json' )
 
 #This bit should come last, I think, as it calls things from above

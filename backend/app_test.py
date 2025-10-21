@@ -1,6 +1,6 @@
 #Test for basic functions
-from obtain_data import find_basic_info, find_station_info, find_stations
-from data_functions import rank_stations, find_first_splits, filter_splits, find_journeys, find_second_splits
+from obtain_data import find_basic_info, find_stations
+from data_functions import rank_stations, find_first_splits, filter_splits, find_second_splits
 from datetime import datetime as dt, timedelta
 import datetime
 import json, sys
@@ -9,25 +9,27 @@ import matplotlib
 matplotlib.use("Agg")
 
 #source ../.venv/bin/activate.csh
+#https://ojp.nationalrail.co.uk/service/timesandfares/DHM/WRS/211025/1519/dep
 
-origin = "YRK"; destination = "DBY"
+origin = "DHM"; destination = "DON"
 request_info = {"origin": origin, 
                 "destination": destination, 
-                "start_time": datetime.time(9,0), 
-                "date": dt.today() + timedelta(days = 1), 
-                "end_time": datetime.time(13,0),
+                "start_time": datetime.time(15,0), 
+                "date": dt.today() + timedelta(days = 0), 
+                "end_time": datetime.time(18,0),
                 "ignore_previous": False,
                 "nchecks_init":100,
                 "max_extra_time":125,
-                "request_depth": 2,
+                "request_depth": 1,
                 "check_number": 0   #For the second level of request depths, which can take some time.
                 }   
-
 
 if request_info["request_depth"] == 0:
     #This is just a basic request. So do that.
     journeys = find_basic_info(request_info, [])
     journeys = filter_splits(request_info, journeys)
+    # for journey in journeys:
+    #     print(journey)
 
 else:
     station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
@@ -41,6 +43,8 @@ else:
     journeys = filter_splits(request_info, journeys)
     print(len(journeys), ' valid journeys after filtering stage 1')
     journeys = [journeys]
+    # for journey in journeys:
+    #     print(journey)
 
     if request_info["request_depth"] == 2 and len(journeys) > 0:
         station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
