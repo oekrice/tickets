@@ -86,9 +86,11 @@ def find_basic_info(input_parameters, alljourneys = []):
 
     #print('Nesting', input_parameters["nesting_degree"])
     USER_AGENTS = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-        "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/130.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/128.0",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:125.0) Gecko/20100101 Firefox/125.0",
     ]
 
     journeys = []   #to be appended to, eventually
@@ -187,7 +189,7 @@ def find_basic_info(input_parameters, alljourneys = []):
             tree = html.fromstring(page)
 
             if len(page) == 118:
-                print('National rail have cottoned on to at least one of these pages... Waiting for a bit and trying again.')
+                #print('National rail have cottoned on to at least one of these pages... Waiting for a bit and trying again.')
                 time.sleep(60.0 + 10.*random.uniform(0,1))
                 success = False
                 start_times = start_times_current.copy()
@@ -392,7 +394,7 @@ def find_stations(request_info):
         alliswell = True
         for page in pages:
             if len(page) == 118:
-                print('National rail have cottoned on to at least one of these pages... Waiting for a couple of minutes.')
+                #print('National rail have cottoned on to at least one of these pages... Waiting for a couple of minutes.')
                 alliswell = False
 
         if alliswell:
@@ -474,4 +476,5 @@ def find_stations(request_info):
         json.dump(final_station_data, f)
     #We're using alljourneys here ONLY to rank the stations with rough prices, and don't actually care about whether these journeys are doable. That comes later. So for now this is probably fine to be as-is.
     #It might be worth changing the parameters here to be a generic midday time or something? Actually, let's just do that. In a minute.
+    print("Station data for this subroute found. Hopefully won't need to do that again")
     return final_station_data
