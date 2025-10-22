@@ -50,7 +50,10 @@ def station_inout(stations, date):
     for station in stations:
         urls.append(makeurl_rtt(station, date_formatted))
 
-    pages = asyncio.run(scrape_new(urls))
+    try:
+        pages = asyncio.run(scrape_new(urls))
+    except:
+        print('Scraping has failed with URLS:', urls)
 
     inouts = {}
     for pi, page in enumerate(pages):
@@ -139,7 +142,7 @@ def find_basic_info(input_parameters, alljourneys = []):
             "Connection": "keep-alive",
         }
         async with sem:
-            async with session.get(url, headers=headers, timeout = 15.0) as response:
+            async with session.get(url, headers=headers, timeout = 60.0) as response:
                 return await response.text()
 
     async def scrape_new(urls):
@@ -171,7 +174,10 @@ def find_basic_info(input_parameters, alljourneys = []):
         #New bit of code to stop asyncio getting confused.
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        pages = loop.run_until_complete(scrape_new(urls))
+        try:
+            pages = loop.run_until_complete(scrape_new(urls))
+        except:
+            print('Scraping has failed with URLS:', urls)
         loop.close()
         pi = 0
         success = True
@@ -181,7 +187,7 @@ def find_basic_info(input_parameters, alljourneys = []):
             tree = html.fromstring(page)
 
             if len(page) == 118:
-                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a bit and trying again.')
+                print('National rail have cottoned on to at least one of these pages... Waiting for a bit and trying again.')
                 time.sleep(60.0 + 10.*random.uniform(0,1))
                 success = False
                 start_times = start_times_current.copy()
@@ -327,7 +333,7 @@ def find_stations(request_info):
             "Connection": "keep-alive",
         }
         async with sem:
-            async with session.get(url, headers=headers, timeout = 15.0) as response: #This can get stuck. Not sure how to fix that yet but the internet will know.
+            async with session.get(url, headers=headers, timeout = 60.0) as response: #This can get stuck. Not sure how to fix that yet but the internet will know.
                 return await response.text()
 
     async def scrape_new(urls):
@@ -386,7 +392,7 @@ def find_stations(request_info):
         alliswell = True
         for page in pages:
             if len(page) == 118:
-                print('National rail have cottoned on to at least one of these pages... Waiting a bit and trying again with this search input. Waiting for a couple of minutes.')
+                print('National rail have cottoned on to at least one of these pages... Waiting for a couple of minutes.')
                 alliswell = False
 
         if alliswell:

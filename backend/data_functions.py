@@ -6,6 +6,7 @@ from datetime import time
 import matplotlib.pyplot as plt
 import matplotlib
 from pathlib import Path
+import sys
 matplotlib.use("Agg")
 
 def rank_stations(request_info, station_info, rank_type):
@@ -101,38 +102,67 @@ def find_second_splits(request_info, station):
     individual_journeys.append(journeys)
 
     alljourneys = []; id_count = 0
+
+    station_checks = []
     #Once these have all completed, save into a nice ordered list and check for reasonable combinations
     for journey_group in individual_journeys:
         for journey in journey_group:
             alljourneys.append(journey)
             alljourneys[-1]["id"] = id_count
             id_count += 1
+            station_check = journey["origin"]
+            if station_check not in station_checks:
+                station_checks.append(station_check)
+
+    #At this point, determine all the station in/outs which need to be checked to see whether changes are real or not
+    print('Checking changes are possible at', len(station_checks),  'stations')
+    inout_times = station_inout(station_checks, input_parameters_first["date"])
 
     #Find combinations of these which work.
     print('All trains found at stage two. Finding valid combinations.')
     splits = []
     for i1, j1 in enumerate(alljourneys):
         for i2, j2 in enumerate(alljourneys):
-            if j1["destination"] == j2["origin"] and float(j1["arr_time"]) <= float(j2["dep_time"]):
-                #This is valid. Combine into a single journey object.
-                #Determine existing split stations here
-                splits.append({
-                    'origin':j1['origin'], 'destination': j2['destination'],
-                    'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
-                    'price':j1['price'] + j2['price'],
-                    'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
-                    'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
-                    'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
-                    'split_prices':j1["split_prices"] + j2["split_prices"]
-                })
-        if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
+            if j1["destination"] == j2["origin"]:
+
+                change_time = 0.0   #Assume this isn't a change unless otherwise informed (if it doesn't appear in an otherwise-populated list)
+                nchange_add = 0
+                if len(inout_times[j1["destination"]]) > 0:
+                    if [float(j1["arr_time"]), float(j2["dep_time"])] in inout_times[j1["destination"]]:
+                        #Probably direct
+                        change_time = 0.0
+                    else:
+                        change_time = 5.0
+                        nchange_add = 1
+
+                #Alas at this point it's probably not worth changing to datetimes and back, so just do a mod bodge
+                if float(j2["dep_time"])%100 < change_time:
+                    latest_arrival = float(j2["dep_time"]) - 100 + 60 - change_time
+                else:
+                    latest_arrival = float(j2["dep_time"]) - change_time
+            
+                if float(j1["arr_time"]) <= latest_arrival:
+                    #This is valid. Combine into a single journey object.
+                    #Determine existing split stations here
+
+                    splits.append({
+                        'origin':j1['origin'], 'destination': j2['destination'],
+                        'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
+                        'price':j1['price'] + j2['price'],
+                        'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
+                        'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
+                        'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
+                        'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add
+                    })
+
+            if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
                 splits.append({
                     'origin':j1['origin'], 'destination': j1['destination'],
                     'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
                     'price':j1['price'],
                     'split_stations':j1['split_stations'],
                     'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
-                    'split_prices':j1["split_prices"]
+                    'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"]
                 })
 
     return splits
@@ -273,33 +303,6 @@ def filter_splits(request_info, unfiltered_splits):
     local_matrix = price_matrix.copy() 
     minprice = 1e6; maxprice = 0
     mintime = 1e6
-    # direct_matrix = price_matrix.copy()
-
-    # #Determine the basic matrix of possible times, so impossible times don't get unduly prioritised (but not disregarded entirely)
-    # for split in unfiltered_splits:
-        
-    #     t0 = dt.strptime(split["dep_time"], "%H%M")
-    #     t1 = dt.strptime(split["arr_time"], "%H%M")
-    #     jtime = abs(t1 - t0).total_seconds()/3600   #Number of hours
-    #     mintime = min(mintime, jtime)
-    #     #Check if this split is an optimal one (so far!), and if so update the matrix for it.
-    #     xbin = np.digitize(t0.hour  + t0.minute/60, xs) - 1
-    #     ybin = np.digitize(jtime, ys) - 1
-    #     maxprice = max(split["price"], maxprice)
-    #     minprice = min(split["price"], minprice)
-    #     if split["price"] < direct_matrix[xbin,ybin] and len(split["split_stations"]) == 0:
-    #         spreadmin = max(0, xbin-spread_bins); spreadmax = min(xbin+spread_bins,len(xs))
-    #         #Update the price matrix here. Don't want loops but might have to have them... Bugger.
-    #         local_matrix[spreadmin:spreadmax+1,ybin] = split["price"]
-    #         local_matrix[spreadmin:spreadmax+1,ybin+1:] = split["price"] - 0.005  #Don't bother with ones which are exactly the same price
-    #         #Update for journeys which left earlier but took longer (arriving at the same time or later)
-    #         for c, i in enumerate(range(xbin-1, -1, -1)):
-    #             if ybin + c < len(ys):
-    #                 local_matrix[i,ybin+c+1:] = split["price"] - 0.005
-    #         direct_matrix = np.minimum(direct_matrix, local_matrix)
-    #         local_matrix[:,:] = 1e6
-
-    # local_matrix = price_matrix.copy() 
 
     for split in unfiltered_splits:
         

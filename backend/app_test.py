@@ -11,16 +11,16 @@ matplotlib.use("Agg")
 #source ../.venv/bin/activate.csh
 #https://ojp.nationalrail.co.uk/service/timesandfares/DHM/WRS/211025/1519/dep
 
-origin = "DHM"; destination = "DON"
+origin = "YRK"; destination = "RCE"
 request_info = {"origin": origin, 
                 "destination": destination, 
-                "start_time": datetime.time(15,0), 
-                "date": dt.today() + timedelta(days = 0), 
+                "start_time": datetime.time(12,0), 
+                "date": dt.today() + timedelta(days = 3), 
                 "end_time": datetime.time(18,0),
                 "ignore_previous": False,
                 "nchecks_init":100,
                 "max_extra_time":125,
-                "request_depth": 1,
+                "request_depth": 2,
                 "check_number": 0   #For the second level of request depths, which can take some time.
                 }   
 
@@ -32,21 +32,22 @@ if request_info["request_depth"] == 0:
     #     print(journey)
 
 else:
-    station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
+    # station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
 
-    #The checks at this point will depend on the magnitude of the request
-    station_checks = rank_stations(request_info, station_info, 1) #This is automatically filtered to the right level later on
+    # #The checks at this point will depend on the magnitude of the request
+    # station_checks = rank_stations(request_info, station_info, 1) #This is automatically filtered to the right level later on
 
-    print('Finding single splits between', request_info["origin"], 'and', request_info["destination"])
-    journeys = find_first_splits(request_info, station_checks)
-    print(len(journeys), ' valid journeys before filtering stage 1')
-    journeys = filter_splits(request_info, journeys)
-    print(len(journeys), ' valid journeys after filtering stage 1')
-    journeys = [journeys]
-    # for journey in journeys:
-    #     print(journey)
+    # print('Finding single splits between', request_info["origin"], 'and', request_info["destination"])
+    # journeys = find_first_splits(request_info, station_checks)
+    # print(len(journeys), ' valid journeys before filtering stage 1')
+    # journeys = filter_splits(request_info, journeys)
+    # print(len(journeys), ' valid journeys after filtering stage 1')
+    # journeys = [journeys]
+    # # for journey in journeys:
+    # #     print(journey)
+    journeys = []
 
-    if request_info["request_depth"] == 2 and len(journeys) > 0:
+    if request_info["request_depth"] == 2:# and len(journeys) > 0:
         station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
         second_checks = rank_stations(request_info, station_info, 2)
         #Run through these second checks as if they are firsts.

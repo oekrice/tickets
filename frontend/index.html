@@ -73,6 +73,7 @@
     let trainDataRaw, trainData, existingData
     let stationData
     let detailFlag = false
+    let sortOptionSet = 0
     if (trainData == null){
         trainData = []
     }
@@ -87,20 +88,19 @@
     }
 
     //THIS IS FOR TESTING -- COMMENT OUT TO USE NORMALLY
-    loadTest().then(data => {
-        trainData = data;
-        console.log('datalength a', trainData.length)
+    // loadTest().then(data => {
+    //     trainData = data;
+    //     console.log('datalength a', trainData.length)
 
-        makeResultTable(trainData)
-        document.getElementById("outputTable").style.display = "block"
-        document.getElementById("sort-options").style.display = "block";
+    //     makeResultTable(trainData)
+    //     document.getElementById("outputTable").style.display = "block"
+    //     document.getElementById("sort-options").style.display = "block";
     
-    })
+    // })
 
     function sortTrains(sortOption){
         //Sorts the results in place based on the selected option 
         //Either departure time (the default), price or a made up 'value' function
-        console.log('Sorting with option', sortOption, trainData.length)
         var sortValues = []
         if (sortOption == 0){
             //This is departure time. Make an array of the values to be sorted
@@ -126,23 +126,20 @@
         } else if (sortOption == 2) {
             for (let i = 0; i < trainData.length; i ++){
                 let journeyTime = findJourneyTime(trainData[i].dep_time, trainData[i].arr_time)
-                console.log(journeyTime)
                 sortValues.push(journeyTime)
         }
         } else if (sortOption == 3) {
             for (let i = 0; i < trainData.length; i ++){
                 let journeyTime = findJourneyTime(trainData[i].dep_time, trainData[i].arr_time)
                 let journeyMinutes = journeyTime.getUTCMinutes() + journeyTime.getUTCHours()*60
-                let value = trainData[i].price + 10.0*journeyMinutes/60
-                console.log(journeyTime)
+                let value = trainData[i].price + 5.0*journeyMinutes/60
                 sortValues.push(value)
         }
         }
-        
+        sortOptionSet = sortOption
         const paired = trainData.map((item, i) => [item, sortValues[i]]);
         paired.sort((a, b) => a[1] - b[1]);
         trainData = paired.map(pair => pair[0]);
-        console.log(trainData)
         makeResultTable(trainData);
 
     }
@@ -180,9 +177,8 @@
                     trainData = JSON.parse(trainDataRaw)  //Object containing the train outputs
                     xmlDoc = parser.parseFromString(trainDataRaw,"text/xml")
                     //At this point trigger a function to enable the HTML to make a nice table of the results
-
-                    console.log(trainData)
-                    makeResultTable(trainData)
+                    sortTrains(sortOptionSet)   //This also makes the data table so don't need to add it below any more
+                    //makeResultTable(trainData)
 
                     //If no results found, say as much and don't display the table
                     if (trainData.length == 0) {
@@ -247,12 +243,14 @@
                             document.getElementById("outputTable").style.display = "block";
                             document.getElementById("sort-options").style.display = "block";
                         document.getElementById("status-container").innerHTML = resultInfo;
-                            makeResultTable(trainData)
+                            sortTrains(sortOptionSet)   //This also makes the data table
+                            //makeResultTable(trainData)
                         } else if (trainData.length == 0 && existingData.length > 0) {   //This is done now. Just leave it as is if possible.
                             resultInfo = 'Finished. ' + existingData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
                             document.getElementById("outputTable").style.display = "block";
                             document.getElementById("sort-options").style.display = "block";
-                        }
+                            trainData = existingData
+                        }   
                         document.getElementById("status-container").innerHTML = resultInfo;
                     } else {                             
                         resultInfo = 'The code might still be running, or the scraper may have been thwarted. Wait and see I guess...'
