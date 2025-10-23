@@ -93,6 +93,9 @@ RUN: sudo docker run -v "$(pwd)/frequency_data:/striking/frequency_data" -p 8501
 RUN: sudo docker rm -f tickets
 
 #Test and reset nginx
+sudo systemctl stop nginx
+sudo systemctl disable nginx
+sudo systemctl enable --now nginx
 RUN: sudo nginx -t
 RUN: sudo systemctl reload nginx  
 
