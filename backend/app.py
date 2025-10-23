@@ -149,5 +149,5 @@ def trains():
 
 #This bit should come last, I think, as it calls things from above
 if __name__ == "__main__":
-    serve(app, host="0.0.0.0", port=5000, channel_timeout = 1800)
+    serve(app, host="0.0.0.0", port=5000)
 
