@@ -164,7 +164,7 @@
 
             try {
                 // Send the POST request
-                const response = await fetch("http://localhost:5000/trains", {
+                const response = await fetch("/trains", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json;charset=UTF-8"
@@ -221,7 +221,7 @@
 
                 try {
                     // Send the POST request
-                    const response = await fetch("http://localhost:5000/trains", {
+                    const response = await fetch("/trains", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json;charset=UTF-8"
