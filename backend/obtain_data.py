@@ -54,6 +54,7 @@ def station_inout(stations, date):
         pages = asyncio.run(scrape_new(urls))
     except:
         print('Scraping has failed with URLS:', urls)
+        pages = []
 
     inouts = {}
     for pi, page in enumerate(pages):
@@ -209,7 +210,6 @@ def find_basic_info(input_parameters, alljourneys = []):
                 if len(dep) == 0:
                     with open("testpage.html", "w") as file:
                         file.write(page)    
-                    print('Failed', url[pi])                
                 price = tree.xpath('//label[@class="opsingle"]/text()')
                 zerochanges = tree.xpath('//div[@class="chg"]/text()')
 

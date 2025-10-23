@@ -175,6 +175,14 @@ def find_second_splits(request_info, station):
 def find_first_splits(request_info, station_checks):
     #The degree to which this goes in-depth depends entirely on the request info. Should be quite general ideally, but that's very tricky.
 
+    if False:
+        print('TESTING LINE 178::')
+
+        print('Checking changes are possible at', len(allchecks),  'stations')
+        inout_times = station_inout(np.array(allchecks)[:,0], request_info["date"])
+        print('Done')
+        sys.exit()
+
     nchecks_init = request_info.get("nchecks_init", 20)
     allchecks = station_checks[:nchecks_init]
     nrequests_max = 100  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
@@ -233,7 +241,7 @@ def find_first_splits(request_info, station_checks):
     print('Checking changes are possible at', len(station_checks),  'stations')
     inout_times = station_inout(station_checks, input_parameters_first["date"])
     #Find combinations of these which work. Would like to put a time limit in here, ideally, but not sure where to obtain such information. Maybe just not do this for now. Yes.
-    print('All trains found. Finding valid combinations.')
+    print('All trains found and changes checked. Finding valid combinations.')
     splits = []
     for i1, j1 in enumerate(alljourneys):
         for i2, j2 in enumerate(alljourneys):
