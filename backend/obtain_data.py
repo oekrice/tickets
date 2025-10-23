@@ -152,7 +152,6 @@ def find_basic_info(input_parameters, alljourneys = []):
                         success = True
                         return text
             await asyncio.sleep(1.0)
-        print('Failed', ntries, url)
         return text
     async def scrape_new(urls):
         sem = asyncio.Semaphore(20)
@@ -178,7 +177,6 @@ def find_basic_info(input_parameters, alljourneys = []):
 
             urls.append(url)
 
-        print('a', urls)
         start_times_current = start_times.copy()
         start_times = []  #Need to reset and do this each time
         #New bit of code to stop asyncio getting confused.
@@ -208,7 +206,6 @@ def find_basic_info(input_parameters, alljourneys = []):
                 wait_time = 120.0
                 dep = tree.xpath('//div[@class="dep"]/text()')
                 arr = tree.xpath('//div[@class="arr"]/text()')
-                print(pi, dep, arr, len(page))
                 if len(dep) == 0:
                     with open("testpage.html", "w") as file:
                         file.write(page)    
@@ -280,7 +277,6 @@ def find_basic_info(input_parameters, alljourneys = []):
         if startcount > 20:  #Something has gone terribly wrong... Abort. Can happen too if stations are actually in the same place.
             go = False
 
-    print('njourneys_raw', len(journeys))
     #print('Waves of requests:', startcount)
     unique_journeys = []; seen = set()
     for journey in journeys:
