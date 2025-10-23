@@ -86,10 +86,11 @@ RUN: mkdir backend/station_data
 
 #Actually run Brenda with docker:
 RUN: sudo docker build -t tickets .
+sudo docker run -p 5000:5000 --name tickets tickets
 RUN: sudo docker run -v "$(pwd)/frequency_data:/striking/frequency_data" -p 8501:8501 --name brenda brenda
 
 #Stop running Brenda
-RUN: sudo docker rm -f brenda
+RUN: sudo docker rm -f tickets
 
 #Test and reset nginx
 RUN: sudo nginx -t
