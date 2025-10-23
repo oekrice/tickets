@@ -242,7 +242,7 @@
                         if (trainData.length == 0 && existingData.length == 0) {
                             resultInfo = "No trains found."
                         } else if (trainData.length > 0) {
-                            resultInfo = 'Still finding trains... Currently found ' + trainData.length.toString() + " trains between " + String(originStation) + " and " + String(destinationStation) + "<br>. Wait a bit longer and these might get cheaper. Click for more info."
+                            resultInfo = 'Still finding trains... Currently found ' + trainData.length.toString() + " trains between " + String(originStation) + " and " + String(destinationStation) + ".<br>Wait a bit longer and these might get cheaper. Click for more info."
                             document.getElementById("outputTable").style.display = "block";
                             document.getElementById("sort-options").style.display = "block";
                         document.getElementById("status-container").innerHTML = resultInfo;
