@@ -88,8 +88,6 @@ def find_basic_info(input_parameters, alljourneys = []):
     USER_AGENTS = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
-        "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/128.0",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
         "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:125.0) Gecko/20100101 Firefox/125.0",
     ]
 
@@ -143,10 +141,19 @@ def find_basic_info(input_parameters, alljourneys = []):
             "Accept-Language": "en-US,en;q=0.9",
             "Connection": "keep-alive",
         }
-        async with sem:
-            async with session.get(url, headers=headers, timeout = 60.0) as response:
-                return await response.text()
-
+        success = False; ntries = 0
+        while not success and ntries < 5:
+            async with sem:
+                async with session.get(url, headers=headers, timeout = 60.0) as response:
+                    text = await response.text()
+                    if len(text) > 200000:  #This has been redirected for some reason
+                        ntries += 1
+                    else:
+                        success = True
+                        return text
+            await asyncio.sleep(1.0)
+        print('Failed', ntries, url)
+        return text
     async def scrape_new(urls):
         sem = asyncio.Semaphore(20)
         connector = aiohttp.TCPConnector(limit=20)
@@ -171,6 +178,7 @@ def find_basic_info(input_parameters, alljourneys = []):
 
             urls.append(url)
 
+        print('a', urls)
         start_times_current = start_times.copy()
         start_times = []  #Need to reset and do this each time
         #New bit of code to stop asyncio getting confused.
@@ -200,6 +208,11 @@ def find_basic_info(input_parameters, alljourneys = []):
                 wait_time = 120.0
                 dep = tree.xpath('//div[@class="dep"]/text()')
                 arr = tree.xpath('//div[@class="arr"]/text()')
+                print(pi, dep, arr, len(page))
+                if len(dep) == 0:
+                    with open("testpage.html", "w") as file:
+                        file.write(page)    
+                    print('Failed', url[pi])                
                 price = tree.xpath('//label[@class="opsingle"]/text()')
                 zerochanges = tree.xpath('//div[@class="chg"]/text()')
 
@@ -266,6 +279,8 @@ def find_basic_info(input_parameters, alljourneys = []):
 
         if startcount > 20:  #Something has gone terribly wrong... Abort. Can happen too if stations are actually in the same place.
             go = False
+
+    print('njourneys_raw', len(journeys))
     #print('Waves of requests:', startcount)
     unique_journeys = []; seen = set()
     for journey in journeys:
