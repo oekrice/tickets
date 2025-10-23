@@ -303,7 +303,7 @@ def find_stations(request_info):
     #This should be roughly similar for the same pair of stations each time, so can probably be cached or equivalent. It's certainly quite slow :(
 
     max_deviation = request_info.get("max_deviation",0.5)   #How far off the route to go. Some can really get quite improbable so it's worth setting this quite high...
-    all_station_data = json.loads(open('./station_info.json').read())
+    all_station_data = json.loads(open('./backend/station_info.json').read())
     station_data = {}; station_list = []
     x0 = (all_station_data[origin]['latitude'], all_station_data[origin]['longitude']); x2 = (all_station_data[destination]['latitude'], all_station_data[destination]['longitude'])
     dref = geodesic(x0, x2).miles
@@ -459,7 +459,7 @@ def find_stations(request_info):
     #Use this data to determine the final station data (filter out impossible ones and things, and give some kind of scores. Time score plus price score (both to be minimised?)
     final_station_data = {}
     for station in station_data:
-        if 'time1' in station_data[station] and 'time2' in station_data[station]:
+        if 'time1' in station_data[station] and 'time2' in station_data[station] and abs(station_data[station]['progress'] - 1.0) > 1e-6:
             #This appears to be a valid option
             time_score = station_data[station]['time1'] + station_data[station]['time2'] - reftime
             price1 = np.abs(station_data[station]['price1']/station_data[station]['progress'])

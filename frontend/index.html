@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title> Test page</title>
+    <title>Oliver's Split Ticket Finder</title>
     <link rel="stylesheet" href="style.css">
 
 </head>
@@ -164,7 +164,7 @@
 
             try {
                 // Send the POST request
-                const response = await fetch("http://localhost:14752/trains", {
+                const response = await fetch("http://localhost:5000/trains", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json;charset=UTF-8"
@@ -221,7 +221,7 @@
 
                 try {
                     // Send the POST request
-                    const response = await fetch("http://localhost:14752/trains", {
+                    const response = await fetch("http://localhost:5000/trains", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json;charset=UTF-8"

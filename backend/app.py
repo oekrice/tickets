@@ -1,6 +1,6 @@
 #Start of my project figuring out how the internet works. Very good.
 
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 import flask
 import json
 from flask_cors import CORS
@@ -9,6 +9,7 @@ from obtain_data import find_basic_info, find_stations
 from data_functions import rank_stations, find_first_splits, find_second_splits, find_second_splits, filter_splits
 from datetime import datetime as dt, timedelta
 from pathlib import Path
+from waitress import serve
 import sys
 import datetime
 
@@ -16,13 +17,13 @@ import datetime
 
 #source ../.venv/bin/activate.csh
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="../frontend", static_url_path="")
 CORS(app)
 #This decorator tells the frontend to run the below function when the url "/" is used.
 
 @app.route("/")
-def hello():
-    return "Hello, World!"
+def serve_index():
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.route('/users', methods=["GET","POST"])   #Same as above, but the methods are 'GET' and 'POST' for to and fro, respectively
 def users():
@@ -148,5 +149,5 @@ def trains():
 
 #This bit should come last, I think, as it calls things from above
 if __name__ == "__main__":
-    app.run("localhost", 14752)
+    serve(app, host="0.0.0.0", port=5000, channel_timeout = 1800)
 

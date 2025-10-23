@@ -38,9 +38,6 @@ sudo firewall-cmd --permanent --add-service=http
 sudo firewall-cmd --permanent --add-service=https
 sudo firewall-cmd --reload
 
-#Install nginx
-sudo dnf install -y nginx
-sudo systemctl enable --now nginx
 
 #Install certbot (this didn't work before but I'm more awake today...)
 #-----------------------------------------------
@@ -66,14 +63,14 @@ RUN: sudo nginx -t
 RUN: sudo systemctl reload nginx  
 
 #File should be in the GitHub (and I'll update it as appropriate), one hopes, but need to copy to the right place
-sudo cp brenda_setup.conf /etc/nginx/conf.d/brenda.conf    #MAYBE, or not. Who knows?    
-sudo /snap/bin/certbot --nginx -d brenda.oekrice.com -d brenda.oekrice.com
+sudo cp tickets_setup.conf /etc/nginx/conf.d/tickets.conf    #MAYBE, or not. Who knows?    
+sudo /snap/bin/certbot --nginx -d tickets.oekrice.com -d tickets.oekrice.com
 sudo /snap/bin/certbot renew --dry-run    #Just to test
 Follow prompts. Should be OK... Check Brenda file is still all right
 
 #Allow streamlit and other things through the firewall
 sudo dnf install firewalld
-sudo firewall-cmd --zone=public --permanent --add-port=8501/tcp 
+sudo firewall-cmd --zone=public --permanent --add-port=5000/tcp 
 sudo firewall-cmd --zone=public --permanent --add-port=80/tcp
 sudo firewall-cmd --zone=public --permanent --add-port=443/tcp
 sudo firewall-cmd --reload
@@ -84,12 +81,11 @@ RUN: sudo cp brenda.conf /etc/nginx/conf.d/brenda.conf   #Copy complete Brenda c
 RUN: sudo cp -a oracle_root/. ../  #To be confirmed on next install (call from in Striking)
 
 #Below here to actually run things -- may end up different!
-RUN: mkdir frequency_data
-RUN: mkdir saved_touches
+RUN: mkdir backend/station_data
 #Mount the volume so Docker can deal with it
 
 #Actually run Brenda with docker:
-RUN: sudo docker build -t brenda .
+RUN: sudo docker build -t tickets .
 RUN: sudo docker run -v "$(pwd)/frequency_data:/striking/frequency_data" -p 8501:8501 --name brenda brenda
 
 #Stop running Brenda
