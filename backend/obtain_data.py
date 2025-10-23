@@ -35,7 +35,7 @@ def station_inout(stations, date):
 
     async def fetch(sem, session, url):
         async with sem:
-            async with session.get(url, timeout = 15.0) as response: #This can get stuck. Not sure how to fix that yet but the internet will know.
+            async with session.get(url, timeout = 120.0) as response: #This can get stuck. Not sure how to fix that yet but the internet will know.
                 return await response.text()
 
     async def scrape_new(urls):
