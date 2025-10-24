@@ -29,17 +29,16 @@ def rank_stations(request_info, station_info, rank_type):
         #Filter stations based on the timing above. Need a hard cutoff here which will actually reduce as the constraints become more extreme, so it should complete in logarithmic time.
         local_start_time = t0 + station_info[station]["in_time"]
         local_end_time = t1 - station_info[station]["out_time"]
-        if rank_type == 1:
-            if (local_start_time <=  local_end_time) and (station_info[station]["in_time"] + station_info[station]["out_time"] < max_time) and station != request_info["destination"]:
+        if rank_type == 1:  #For first splits
+            if (local_start_time <=  local_end_time) and (station_info[station]["in_time"] + station_info[station]["out_time"] < max_time):
                 #Sort the stations based on the above
                 prices.append(station_info[station]["price_score"])
                 times.append(station_info[station]["time_score"])
                 stats.append([station, local_start_time, local_end_time])
-        else:
+        else:   #For second splits
             if (local_start_time <=  local_end_time) and (station_info[station]["in_time"] + station_info[station]["out_time"] < max_time) and station != request_info["destination"] and station_info[station]["progress"] < 0.85 and station_info[station]["progress"] > 0.15:
                 #Sort the stations based on the above
-                #ONLY KEEP ONES ENROUTE
-                
+                #ONLY KEEP ONES ENROUTE - NO GOING BACKWARDS
                 if station_info[station]["time_score"] <= 5.:   #Only enroute or close to it
                     prices.append(station_info[station]["price_score"])
                     times.append(station_info[station]["time_score"])
@@ -278,15 +277,16 @@ def find_first_splits(request_info, station_checks):
                         'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
                         'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add
                     })
-                if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
-                        splits.append({
-                            'origin':j1['origin'], 'destination': j1['destination'],
-                            'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
-                            'price':j1['price'],
-                            'split_stations':j1['split_stations'],
-                            'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
-                            'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"]
-                        })
+
+            if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
+                    splits.append({
+                        'origin':j1['origin'], 'destination': j1['destination'],
+                        'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
+                        'price':j1['price'],
+                        'split_stations':j1['split_stations'],
+                        'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
+                        'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"]
+                    })
 
 
     return splits

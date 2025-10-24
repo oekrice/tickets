@@ -25,5 +25,19 @@ tr.details {
 
 tr:nth-child(4n-2) {
   background-color: #ffe15b;
+  
+}
+
+.runButton {
+  width: 100%;
+  padding: 5px 5px;
+  margin: 4px 2px;
+  max-width: 400px;
+  align-items: center;
+  justify-content: center;
+}
+
+body {
+  padding-bottom: 150px;
 }
 

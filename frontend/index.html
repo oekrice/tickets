@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Oliver's Split Ticket Finder</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="style.css">
 
 </head>
@@ -39,18 +40,18 @@
 
     <hr>
     <div>
-        <button onclick=getTrains(0)>Get 'direct' trains</button>
-        <button onclick=getTrains(1)>Get basic split tickets</button>
-        <button onclick=getTrains(2)>Get detailed split tickets</button>
+        <button id = "runButton1"; class="runButton" ; onclick=getTrains(0)>Find tickets with no splits</button> <br>
+        <button id = "runButton2"; class="runButton" ; onclick=getTrains(1)>FInd tickets with up to one split (Max. 5 mins to search)</button> <br>
+        <button id = "runButton3"; class="runButton" ; onclick=getTrains(2)>Find tickets with potentially many splits (Max. 30 mins to search)</button>
     </div>
     <hr>
     <div id="status-container"></div>
     <div id="sort-options">
         <p> Sort results by: <br>
-        <button onclick=sortTrains(0)>Departure Time</button>
-        <button onclick=sortTrains(1)>Price</button>
-        <button onclick=sortTrains(2)>Journey Time</button>
-        <button onclick=sortTrains(3)>Value</button>
+        <button id = "sortButton0", class="sortButton",  onclick=sortTrains(0)>Departure Time</button>
+        <button id = "sortButton1",class="sortButton", onclick=sortTrains(1)>Price</button>
+        <button id = "sortButton2", class="sortButton", onclick=sortTrains(2)>Journey Time</button>
+        <button id = "sortButton3", class="sortButton", onclick=sortTrains(3)>Value</button>
         </p>
     </div>
 
@@ -67,6 +68,7 @@
 
     </div>
 </body>
+
 <script>
     "use strict";
     let xhr = null;
@@ -77,11 +79,14 @@
     let stationData
     let detailFlag = false
     let sortOptionSet = 0
+    let searchProgress = 0  //Set to 1 if there is a search happening. This disables the buttons until it finishes.
+
     if (trainData == null){
         trainData = []
     }
     //Update default parameters in the search bar (date etc.) and obtain the list of allowed stations
     document.getElementById("sort-options").style.display = "none"
+    
     getDefaults();  
 
     async function loadTest() {
@@ -104,6 +109,11 @@
     function sortTrains(sortOption){
         //Sorts the results in place based on the selected option 
         //Either departure time (the default), price or a made up 'value' function
+        document.getElementById('sortButton0').disabled = false;
+        document.getElementById('sortButton1').disabled = false;
+        document.getElementById('sortButton2').disabled = false;
+        document.getElementById('sortButton3').disabled = false;
+
         var sortValues = []
         if (sortOption == 0){
             //This is departure time. Make an array of the values to be sorted
@@ -120,16 +130,20 @@
 
         for (let i = 0; i < trainData.length; i ++){
             sortValues.push(parseFloat(trainData[i].dep_time))
+            document.getElementById('sortButton0').disabled = true;
+
         }
         } else if (sortOption == 1) {
             //This is price. Make an array of the values to be sorted
             for (let i = 0; i < trainData.length; i ++){
                 sortValues.push(parseFloat(trainData[i].price))
+            document.getElementById('sortButton1').disabled = true;
         } 
         } else if (sortOption == 2) {
             for (let i = 0; i < trainData.length; i ++){
                 let journeyTime = findJourneyTime(trainData[i].dep_time, trainData[i].arr_time)
                 sortValues.push(journeyTime)
+            document.getElementById('sortButton2').disabled = true;
         }
         } else if (sortOption == 3) {
             for (let i = 0; i < trainData.length; i ++){
@@ -137,6 +151,7 @@
                 let journeyMinutes = journeyTime.getUTCMinutes() + journeyTime.getUTCHours()*60
                 let value = trainData[i].price + 5.0*journeyMinutes/60
                 sortValues.push(value)
+            document.getElementById('sortButton3').disabled = true;
         }
         }
         sortOptionSet = sortOption
@@ -161,11 +176,13 @@
             // console.log(dataToSend);
             if (!dataToSend) {
                 console.log("Insufficient data entered. Aborting.");
+                document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
                 return;
             }
 
             try {
                 // Send the POST request
+                document.querySelectorAll('.runButton').forEach(btn => btn.disabled = true);
                 const response = await fetch("/trains", {
                     method: "POST",
                     headers: {
@@ -192,17 +209,19 @@
                         document.getElementById("sort-options").style.display = "block";
                     }
                     document.getElementById("status-container").innerHTML = resultInfo;
-
+                    document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
                     //document.getElementById('result-container').innerHTML = trainDataRaw;  //This is the bit which actually updates the result text, which is probably as a string. Would be better as an object...
                 } else {
                     resultInfo = 'Request failed for some reason. Try something else?'
                     document.getElementById("status-container").innerHTML = resultInfo;
                     console.error("Request failed with status:", response.status);
+                    document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
                 }
             } catch (error) {
                 resultInfo = "It appears that the server isn't running. Bugger.  <br> Please let me know (if you're not me)."
                 document.getElementById("status-container").innerHTML = resultInfo;
                 console.error("Network error:", error);
+                document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
             }
 
         } else {
@@ -218,17 +237,19 @@
                 existingData = trainData
                 if (!dataToSend) {
                     console.log("Insufficient data entered. Aborting.");
+                    document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
                     return;
                 }
 
                 try {
                     // Send the POST request
+                    document.querySelectorAll('.runButton').forEach(btn => btn.disabled = true);
                     const response = await fetch("/trains", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json;charset=UTF-8"
                         },
-                        body: JSON.stringify(dataToSend)
+                        body: JSON.stringify(dataToSend) 
                     });
 
                     if (response.status === 201) {
@@ -241,10 +262,14 @@
                         //If no results found, say as much and don't display the table
                         if (trainData.length == 0 && existingData.length == 0) {
                             resultInfo = "No trains found."
+                            document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
+
                         } else if (trainData.length > 0) {
                             resultInfo = 'Still finding trains... Currently found ' + trainData.length.toString() + " trains between " + String(originStation) + " and " + String(destinationStation) + ".<br>Wait a bit longer and these might get cheaper. Click for more info."
                             document.getElementById("outputTable").style.display = "block";
                             document.getElementById("sort-options").style.display = "block";
+                            document.querySelectorAll('.runButton').forEach(btn => btn.disabled = true);
+
                         document.getElementById("status-container").innerHTML = resultInfo;
                             sortTrains(sortOptionSet)   //This also makes the data table
                             //makeResultTable(trainData)
@@ -253,17 +278,22 @@
                             document.getElementById("outputTable").style.display = "block";
                             document.getElementById("sort-options").style.display = "block";
                             trainData = existingData
+                            document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
+
                         }   
                         document.getElementById("status-container").innerHTML = resultInfo;
                     } else {                             
                         resultInfo = 'The code might still be running, or the scraper may have been thwarted. Wait and see I guess...'
                         document.getElementById("status-container").innerHTML = resultInfo;
                         console.error("Request failed with status:", response.status);
+                        document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
                     }
                 } catch (error) {
                     resultInfo = "It appears that the server isn't running. Bugger.  <br> Please let me know (if you're not me)."
                     document.getElementById("status-container").innerHTML = resultInfo;
                     console.error("Network error:", error);
+                    document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
+
                 }
                 if (trainData.length == 0) break;   //Whatever has happened before, it's time to stop
                 i ++
