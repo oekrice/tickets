@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 #source ../.venv/bin/activate.csh
 #https://ojp.nationalrail.co.uk/service/timesandfares/DHM/WRS/211025/1519/dep
 
-origin = "YRK"; destination = "SHF"
+origin = "YRK"; destination = "NCL"
 request_info = {"origin": origin, 
                 "destination": destination, 
                 "start_time": datetime.time(12,0), 
@@ -20,7 +20,7 @@ request_info = {"origin": origin,
                 "ignore_previous": False,
                 "nchecks_init":100,
                 "max_extra_time":125,
-                "request_depth": 0,
+                "request_depth": 2,
                 "check_number": 0   #For the second level of request depths, which can take some time.
                 }   
 
@@ -32,19 +32,22 @@ if request_info["request_depth"] == 0:
     #     print(journey)
 
 else:
-    # station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
+    if request_info["request_depth"] == 1:
+   
+        station_info = find_stations(request_info)  #This can definitely be done with multithreading proper like, and should happen at a different time to everything else. Getting things to load into the html would be nice
 
-    # #The checks at this point will depend on the magnitude of the request
-    # station_checks = rank_stations(request_info, station_info, 1) #This is automatically filtered to the right level later on
+        #The checks at this point will depend on the magnitude of the request
+        station_checks = rank_stations(request_info, station_info, 1) #This is automatically filtered to the right level later on
+        # print('Testing')
+        # second_checks = rank_stations(request_info, station_info, 2)
 
-    # print('Finding single splits between', request_info["origin"], 'and', request_info["destination"])
-    # journeys = find_first_splits(request_info, station_checks)
-    # print(len(journeys), ' valid journeys before filtering stage 1')
-    # journeys = filter_splits(request_info, journeys)
-    # print(len(journeys), ' valid journeys after filtering stage 1')
-    # journeys = [journeys]
-    # # for journey in journeys:
-    # #     print(journey)
+        print('Finding single splits between', request_info["origin"], 'and', request_info["destination"])
+        journeys = find_first_splits(request_info, station_checks)
+        print(len(journeys), ' valid journeys before filtering, stage 1')
+        journeys = filter_splits(request_info, journeys)
+        print(len(journeys), ' valid journeys after filtering, stage 1')
+        return_data = journeys
+
     journeys = []
 
     if request_info["request_depth"] == 2:# and len(journeys) > 0:

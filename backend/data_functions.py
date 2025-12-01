@@ -144,32 +144,47 @@ def find_second_splits(request_info, station):
                     #This is valid. Combine into a single journey object.
                     #Determine existing split stations here
 
-                    splits.append({
-                        'origin':j1['origin'], 'destination': j2['destination'],
-                        'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
-                        'price':j1['price'] + j2['price'],
-                        'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
-                        'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
-                        'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
-                        'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add
-                    })
+
+                    if nchange_add == 1: #Need to add a change at the split station
+                        splits.append({
+                            'origin':j1['origin'], 'destination': j2['destination'],
+                            'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
+                            'price':j1['price'] + j2['price'],
+                            'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
+                            'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
+                            'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
+                            'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add,
+                            'change_stations':j1['change_stations'] + [j1["destination"]] + j2['change_stations'], 
+                            'change_arrs': j1["change_arrs"] + [j1["arr_time"]] + j2['change_arrs'],
+                            'change_deps': j1['change_deps'] + [j2["dep_time"]] + j2['change_deps']
+                        })
+                    else:   #Don't need to add any changes
+                        splits.append({
+                            'origin':j1['origin'], 'destination': j2['destination'],
+                            'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
+                            'price':j1['price'] + j2['price'],
+                            'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
+                            'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
+                            'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
+                            'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add,
+                            'change_stations':j1['change_stations'] + j2['change_stations'], 
+                            'change_arrs': j1["change_arrs"] + j2['change_arrs'],
+                            'change_deps': j1['change_deps'] + j2['change_deps']
+                        })
 
             if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
-                splits.append({
-                    'origin':j1['origin'], 'destination': j1['destination'],
-                    'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
-                    'price':j1['price'],
-                    'split_stations':j1['split_stations'],
-                    'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
-                    'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"]
-                })
-
+                    splits.append({
+                        'origin':j1['origin'], 'destination': j1['destination'],
+                        'dep_time':j1['dep_time'], 'arr_time':j1['arr_time'],
+                        'price':j1['price'],
+                        'split_stations':j1['split_stations'],
+                        'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
+                        'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"],
+                        'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"],
+                        'change_stations':j1['change_stations'], 'change_arrs': j1["change_arrs"],
+                        'change_deps': j1['change_deps']
+                    })
     return splits
-
-
-
-
-
 
 def find_first_splits(request_info, station_checks):
     #The degree to which this goes in-depth depends entirely on the request info. Should be quite general ideally, but that's very tricky.
@@ -260,15 +275,33 @@ def find_first_splits(request_info, station_checks):
 
                     #Check whether this is a change or not -- that's quite important as to whether it's valid.
                     #Worst case scenario is that this is misidentified and you get an impossible change or two.
-                    splits.append({
-                        'origin':j1['origin'], 'destination': j2['destination'],
-                        'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
-                        'price':j1['price'] + j2['price'],
-                        'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
-                        'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
-                        'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
-                        'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add
-                    })
+
+                    if nchange_add == 1: #Need to add a change at the split station
+                        splits.append({
+                            'origin':j1['origin'], 'destination': j2['destination'],
+                            'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
+                            'price':j1['price'] + j2['price'],
+                            'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
+                            'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
+                            'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
+                            'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add,
+                            'change_stations':j1['change_stations'] + [j1["destination"]] + j2['change_stations'], 
+                            'change_arrs': j1["change_arrs"] + [j1["arr_time"]] + j2['change_arrs'],
+                            'change_deps': j1['change_deps'] + [j2["dep_time"]] + j2['change_deps']
+                        })
+                    else:   #Don't need to add any changes
+                        splits.append({
+                            'origin':j1['origin'], 'destination': j2['destination'],
+                            'dep_time':j1['dep_time'], 'arr_time':j2['arr_time'],
+                            'price':j1['price'] + j2['price'],
+                            'split_stations':j1["split_stations"] + [j1["destination"]] + j2["split_stations"],
+                            'split_arrs':j1["split_arrs"] + [j1["arr_time"]] + j2["split_arrs"],
+                            'split_deps':j1["split_deps"] + [j2["dep_time"]] + j2["split_deps"],
+                            'split_prices':j1["split_prices"] + j2["split_prices"], 'nchanges': j1["nchanges"] + j2["nchanges"] + nchange_add,
+                            'change_stations':j1['change_stations'] + j2['change_stations'], 
+                            'change_arrs': j1["change_arrs"] + j2['change_arrs'],
+                            'change_deps': j1['change_deps'] + j2['change_deps']
+                        })
 
             if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
                     splits.append({
@@ -277,9 +310,11 @@ def find_first_splits(request_info, station_checks):
                         'price':j1['price'],
                         'split_stations':j1['split_stations'],
                         'split_arrs':j1['split_arrs'], 'split_deps':j1['split_deps'],
-                        'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"]
+                        'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"],
+                        'split_prices':j1["split_prices"], 'nchanges': j1["nchanges"],
+                        'change_stations':j1['change_stations'], 'change_arrs': j1["change_arrs"],
+                        'change_deps': j1['change_deps']
                     })
-
 
     return splits
 

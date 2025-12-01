@@ -45,7 +45,6 @@ def users():
     
 @app.route('/trains', methods = ["GET", "POST"])
 def trains():
-    print('Testing obtaining train info')        
     if request.method == "POST":
         #Get the data from the input
         input_data = request.get_json()

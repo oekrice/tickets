@@ -96,15 +96,15 @@
     }
 
     //THIS IS FOR TESTING -- COMMENT OUT TO USE NORMALLY
-    // loadTest().then(data => {
-    //     trainData = data;
-    //     console.log('datalength a', trainData.length)
+    loadTest().then(data => {
+        trainData = data;
+        console.log('datalength a', trainData.length)
 
-    //     makeResultTable(trainData)
-    //     document.getElementById("outputTable").style.display = "block"
-    //     document.getElementById("sort-options").style.display = "block";
+        makeResultTable(trainData)
+        document.getElementById("outputTable").style.display = "block"
+        document.getElementById("sort-options").style.display = "block";
     
-    // })
+     })
 
     function sortTrains(sortOption){
         //Sorts the results in place based on the selected option 
@@ -408,6 +408,8 @@
         }
 
         for (let i = 0; i < trainData.length; i ++){
+
+            console.log(trainData)
             newRow = outputTable.insertRow(-1);
 
             newCell = newRow.insertCell();
@@ -440,22 +442,42 @@
 
             newRow.classList.add('clickable');
 
-            let detailsRow = outputTable.insertRow();
-            detailsRow.classList.add('details');
-            let cell = detailsRow.insertCell();
+            let changesRow = outputTable.insertRow();
+            changesRow.classList.add('changes');
+            let changeCell = changesRow.insertCell();
 
-            cell.colSpan = 5;
-            cell.innerHTML = trainAdditionalInfo(i, trainData)
+            changeCell.colSpan = 5;
+            changeCell.innerHTML = changesInfo(i, trainData)
+
+
+            let splitsRow = outputTable.insertRow();
+            splitsRow.classList.add('tickets');
+            let splitCell = splitsRow.insertCell();
+
+            splitCell.colSpan = 5;
+            splitCell.innerHTML = trainAdditionalInfo(i, trainData)
 
             newRow.addEventListener('click', () => {
-                detailsRow.style.display =
-                detailsRow.style.display === 'table-row' ? 'none' : 'table-row';
+                changesRow.style.display =
+                changesRow.style.display === 'table-row' ? 'none' : 'table-row';
+                splitsRow.style.display =
+                splitsRow.style.display === 'table-row' ? 'none' : 'table-row';
             });
 
-            detailsRow.addEventListener('click', () => {
-                detailsRow.style.display =
-                detailsRow.style.display === 'table-row' ? 'none' : 'table-row';
+            changesRow.addEventListener('click', () => {
+                changesRow.style.display =
+                changesRow.style.display === 'table-row' ? 'none' : 'table-row';
+                splitsRow.style.display =
+                splitsRow.style.display === 'table-row' ? 'none' : 'table-row';
             });
+
+            splitsRow.addEventListener('click', () => {
+                changesRow.style.display =
+                changesRow.style.display === 'table-row' ? 'none' : 'table-row';
+                splitsRow.style.display =
+                splitsRow.style.display === 'table-row' ? 'none' : 'table-row';
+            });
+
         }
     }
 
@@ -465,6 +487,7 @@
         let returnString = '<div>'
         let rowString = ''  //For each row. This is a bit tricky to format probably
         const nsplits = trainData[trainNumber].split_stations.length
+        returnString += 'Tickets: <br>'
         if (nsplits == 0) {
             returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[0])
         } else {
@@ -476,6 +499,32 @@
             returnString += '<br>'
             }
             returnString += trainData[trainNumber].split_stations[nsplits-1] + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].split_deps[nsplits-1]) + '-' + toTime(trainData[trainNumber].arr_time) + '&nbsp&nbsp' + toPrice(trainData[trainNumber].split_prices[nsplits])
+        }
+
+        returnString += '</div>'
+
+        return returnString
+    }
+
+    function changesInfo(trainNumber, trainData){
+        //Returns the additional info for the train in nicely formatted html
+        //Number of tickets and things. Might need a station lookup?
+        let returnString = '<div>'
+        let rowString = ''  //For each row. This is a bit tricky to format probably
+        const nchanges = trainData[trainNumber].nchanges
+        returnString += 'Itinerary: <br>'
+        console.log(nchanges)
+        if (nchanges == 0) {
+            returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].arr_time)
+        } else {
+            returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].change_stations[0] + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].change_arrs[0])
+            returnString += '<br>'
+            //Then middle changes (if any). Not sure how to test this very well...
+            for (let i = 0; i < nchanges - 1; i++){
+            returnString += trainData[trainNumber].change_stations[i]+ '-' + trainData[trainNumber].change_stations[i+1] + '&nbsp&nbsp' + toTime(trainData[trainNumber].change_deps[i]) + '-' + toTime(trainData[trainNumber].change_arrs[i+1])
+            returnString += '<br>'
+            }
+            returnString += trainData[trainNumber].change_stations[nchanges-1] + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].change_deps[nchanges-1]) + '-' + toTime(trainData[trainNumber].arr_time)
         }
 
         returnString += '</div>'

@@ -12,20 +12,31 @@ th, td {
   padding: 8px;
 }
 
-tr.details {
+tr.tickets {
     display:none;
-     background-color: #33cfff;
+    background-color: hsl(199, 100%, 25%);
     border-collapse: collapse;
     border-style: solid;
     border-width: thin;
     font-family:'Courier New';
-    border-color: 'black'
+    border-color: 'black';
+    color:  #ffffff;
+}
+
+tr.changes {
+    display:none;
+    background-color: #a00000;
+    border-collapse: collapse;
+    border-style: solid;
+    border-width: thin;
+    font-family:'Courier New';
+    border-color: 'black';
+    color:  #ffffff;
 }
 
 
-tr:nth-child(4n-2) {
-  background-color: #ffe15b;
-  
+tr:nth-child(6n-1) {
+  background-color: #ffe65b;
 }
 
 .runButton {
