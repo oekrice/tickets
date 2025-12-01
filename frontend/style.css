@@ -34,9 +34,12 @@ tr.changes {
     color:  #ffffff;
 }
 
-
 tr:nth-child(6n-1) {
   background-color: #ffe65b;
+}
+
+tr:first-child {
+  border-bottom: 1px solid #000;
 }
 
 .runButton {

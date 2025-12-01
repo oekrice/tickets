@@ -96,15 +96,15 @@
     }
 
     //THIS IS FOR TESTING -- COMMENT OUT TO USE NORMALLY
-    loadTest().then(data => {
-        trainData = data;
-        console.log('datalength a', trainData.length)
+    // loadTest().then(data => {
+    //     trainData = data;
+    //     console.log('datalength a', trainData.length)
 
-        makeResultTable(trainData)
-        document.getElementById("outputTable").style.display = "block"
-        document.getElementById("sort-options").style.display = "block";
+    //     makeResultTable(trainData)
+    //     document.getElementById("outputTable").style.display = "block"
+    //     document.getElementById("sort-options").style.display = "block";
     
-     })
+    //  })
 
     function sortTrains(sortOption){
         //Sorts the results in place based on the selected option 
@@ -166,8 +166,61 @@
         //Send the parameters to Python and wait for a response...
         //let requestStatus = 1
 
-        //If requestStatus is 0 or 1, this is simple. If not, it needs to be in a loop to obtain stations in due course. 
+        var thereAreTrains
+        thereAreTrains = true
+        //Add checker in here to see if the journey is actually possible.
+        if (requestStatus > 0){
+            let dataToSend = packageInputData(0, 0);  //Initially do a basic check to see what it comes back with
+            let resultInfo 
+            let parser, xmlDoc
+            parser = new DOMParser()
+            // console.log(dataToSend);
+            if (!dataToSend) {
+                console.log("Insufficient data entered. Aborting.");
+                document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
+                return;
+            }
 
+            try {
+                // Send the POST request
+                document.querySelectorAll('.runButton').forEach(btn => btn.disabled = true);
+                const response = await fetch("/trains", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json;charset=UTF-8"
+                    },
+                    body: JSON.stringify(dataToSend)
+                });
+
+                if (response.status === 201) {
+                    // console.log("Data creation response received!");
+                    trainDataRaw = await response.text();
+                    trainData = JSON.parse(trainDataRaw)  //Object containing the train outputs
+                    xmlDoc = parser.parseFromString(trainDataRaw,"text/xml")
+                    //At this point trigger a function to enable the HTML to make a nice table of the results
+                    sortTrains(sortOptionSet)   //This also makes the data table so don't need to add it below any more
+                    //makeResultTable(trainData)
+
+                    //If no results found, say as much and don't display the table
+                    if (trainData.length == 0) {
+                        resultInfo = "No trains found."
+                        document.getElementById("status-container").innerHTML = resultInfo;
+                        document.getElementById("status-container").innerHTML = resultInfo;
+                        document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
+                        thereAreTrains = false;
+                    } 
+                }
+                } catch (error) {
+                resultInfo = "It appears that the server isn't running. Bugger.  <br> Please let me know (if you're not me)."
+                document.getElementById("status-container").innerHTML = resultInfo;
+                console.error("Network error:", error);
+                document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
+                }
+
+        }
+
+        if (thereAreTrains){
+        //If requestStatus is 0 or 1, this is simple. If not, it needs to be in a loop to obtain stations in due course. 
         if (requestStatus < 2){
             let dataToSend = packageInputData(requestStatus, 0);   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
             let resultInfo 
@@ -305,6 +358,7 @@
             //Need to figure out how many stations to check here (can definitely specify in due course). Perhaps a timeout is wise to stop sending requests?
         }
     }
+    }
 
     function toTime(rawTime){
         //Just a simple function to convert a raw time to a hh:mm etc.
@@ -409,7 +463,6 @@
 
         for (let i = 0; i < trainData.length; i ++){
 
-            console.log(trainData)
             newRow = outputTable.insertRow(-1);
 
             newCell = newRow.insertCell();
@@ -513,7 +566,6 @@
         let rowString = ''  //For each row. This is a bit tricky to format probably
         const nchanges = trainData[trainNumber].nchanges
         returnString += 'Itinerary: <br>'
-        console.log(nchanges)
         if (nchanges == 0) {
             returnString += trainData[trainNumber].origin + '-' + trainData[trainNumber].destination + '&nbsp&nbsp' + toTime(trainData[trainNumber].dep_time) + '-' + toTime(trainData[trainNumber].arr_time)
         } else {
