@@ -174,14 +174,6 @@ def find_second_splits(request_info, station):
 def find_first_splits(request_info, station_checks):
     #The degree to which this goes in-depth depends entirely on the request info. Should be quite general ideally, but that's very tricky.
 
-    if False:
-        print('TESTING LINE 178::')
-
-        print('Checking changes are possible at', len(allchecks),  'stations')
-        inout_times = station_inout(np.array(allchecks)[:,0], request_info["date"])
-        print('Done')
-        sys.exit()
-
     nchecks_init = request_info.get("nchecks_init", 20)
     allchecks = station_checks[:nchecks_init]
     nrequests_max = 100  #This should be lower now as there can potentially be lots of threading within threading at this point. Maybe set to 10? Would be nice to get updates on this.
@@ -326,15 +318,15 @@ def filter_splits(request_info, unfiltered_splits):
         if split["price"] < price_matrix[xbin,ybin]:  #Only update if this is possible directly, or may unfairly prioritise impossible splits.
             spreadmin = max(0, xbin-spread_bins); spreadmax = min(xbin+spread_bins,len(xs))
             #Update the price matrix here. Don't want loops but might have to have them... Bugger.
-            local_matrix[spreadmin:spreadmax+1,ybin] = split["price"]
-            local_matrix[spreadmin:spreadmax+1,ybin+1:] = split["price"] - 0.005  #Don't bother with ones which are exactly the same price
+            #Add in a small bodge to make sure those with extra changes are not favoured
+            local_matrix[spreadmin:spreadmax+1,ybin] = split["price"] + split["nchanges"]*0.0001
+            local_matrix[spreadmin:spreadmax+1,ybin+1:] = split["price"] - 0.005 + split["nchanges"]*0.0001  #Don't bother with ones which are exactly the same price
             #Update for journeys which left earlier but took longer (arriving at the same time or later)
             for c, i in enumerate(range(xbin-1, -1, -1)):
                 if ybin + c < len(ys):
-                    local_matrix[i,ybin+c+1:] = split["price"] - 0.005
+                    local_matrix[i,ybin+c+1:] = split["price"] - 0.005 + split["nchanges"]*0.0001
             price_matrix = np.minimum(price_matrix, local_matrix)
             local_matrix[:,:] = 1e6
-
     maxprice = 0
     xmin = 1e6; xmax = 0
     ymin = 1e6; ymax = 0
@@ -351,7 +343,7 @@ def filter_splits(request_info, unfiltered_splits):
         #Check if this split is an optimal one (so far!), and if so update the matrix for it.
         xbin = np.digitize(t0.hour  + t0.minute/60, xs) - 1
         ybin = np.digitize(jtime, ys) - 1
-        if split["price"] <= price_matrix[xbin,ybin] and jtime < time_limit:
+        if split["price"] + split["nchanges"]*0.0001 <= price_matrix[xbin,ybin] and jtime < time_limit:
             maxprice = max(maxprice, split["price"])
             #Update the price matrix here. Don't want loops but might have to have them... Bugger.
             filtered_splits.append(split)

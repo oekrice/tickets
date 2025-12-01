@@ -194,7 +194,6 @@ def find_basic_info(input_parameters, alljourneys = []):
             page = pages[pi]
             local_end = end_times[pi]
             tree = html.fromstring(page)
-
             if len(page) == 118:
                 #print('National rail have cottoned on to at least one of these pages... Waiting for a bit and trying again.')
                 time.sleep(60.0 + 10.*random.uniform(0,1))
@@ -215,16 +214,30 @@ def find_basic_info(input_parameters, alljourneys = []):
 
                 nonzerochanges = tree.xpath('//div[@class="chg"]//a[@class="changestip-link"]/text()')
 
+                change_deps = tree.xpath('//table[@class="innertable"]//tr/td[2]/text()')
+                change_arrs = tree.xpath('//table[@class="innertable"]//tr/td[5]/text()')
+                change_dep_stats = tree.xpath('//table[@class="innertable"]//tr/td[@class="origin"]/abbr/text()')
+
+                nchangetrains = 0
                 nchanges = []
                 i0 = 0; i1 = 0   #Those which have a link occupy two items in this, which will map to a single item in the second list
                 for i in range(len(dep)): #This length is at least reliable.
                     if zerochanges[i0][0].isnumeric():   #No changes -- carry on
                         nchanges.append(0)
                         i0 += 1
-                    else:  #Is at least one change here
+                    else:  #Is at least one change here. Need to obtain some information as a result.
                         nchanges.append(int(nonzerochanges[i1][0]))
                         i0 += 2
-                        i1 += 1
+                        i1 += 1 
+                        nchangetrains += 1
+                #Check change information matches the required amount -- otherwise might end up with some very strange things
+                if len(change_deps) - nchangetrains != np.sum(nchanges):
+
+                    print(nchanges, change_dep_stats)
+                    print(len(change_deps) - nchangetrains, np.sum(nchanges))
+
+                    raise Exception('Change info has gone wrong, url is', url)
+
 
                 if stop_flags[pi] == 0:  #Don't bother if it's already there...
                     if len(dep) > 0 and len(price) == len(dep)*2:
@@ -232,20 +245,37 @@ def find_basic_info(input_parameters, alljourneys = []):
                         maxdep = dt.strptime("00:01", "%H:%M").time()
                         maxarr = dt.strptime("00:01", "%H:%M").time()
                         for i in range(len(dep)):
+
                             dep1 = dt.strptime(dep[i].strip(), "%H:%M").time()
                             arr1 = dt.strptime(arr[i].strip(), "%H:%M").time()
                             maxdep = max(maxdep, dep1)  #This seems fine!
                             maxarr = max(maxarr, arr1)
-                            #Sometimes no fares are available for various reasons. Just don't list these
+
+                            if nchanges[i] > 0:  #There are changes, so need to figure out the change times
+                                cdeps = []; cstats = []; carrs = []
+                                start_index = int(np.sum(nchanges[:i]) + np.count_nonzero(nchanges[:i]))  #Number of changes before this. 
+                                #Keep in mind the first of each set of changes is duplicated
+                                for change_index in range(start_index, start_index + int(nchanges[i]) + 1):
+                                    cdeps.append(dt.strptime(change_deps[change_index].strip(), "%H:%M").time().strftime("%H%M"))
+                                    carrs.append(dt.strptime(change_arrs[change_index].strip(), "%H:%M").time().strftime("%H%M"))
+                                    cstats.append(change_dep_stats[change_index])
+                            #Sometimes no fares are available for various reasons. Just don't list these. 
+                            #This appears to be becoming more frequent for reasons I don't understand.
                             if len(price[i*2+1].strip()) == 0:
                                 pass
                             else:
                                 p1 = float(price[i*2 + 1].strip()[1:])
+                                doappend = False
                                 if not start_only and not end_only:
                                     if dep1 >= start_times_current[pi] and arr1 <= t_end and arr1 > dep1 and arr1 > start_times_current[pi] and dep1 <= t_end:
-                                        journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1, 'split_stations':[], 'split_arrs':[], 'split_deps':[], 'split_prices':[p1], 'nchanges': nchanges[i]})
+                                        doappend = True
                                 else:
-                                    journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1,      'split_stations':[], 'split_arrs':[], 'split_deps':[],'split_prices':[p1], 'nchanges': nchanges[i]})
+                                    doappend = True
+                                if doappend:
+                                    if nchanges[i] == 0:  #No changes
+                                        journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1, 'split_stations':[], 'split_arrs':[], 'split_deps':[],'split_prices':[p1], 'nchanges': nchanges[i], 'change_stations':[], 'change_arrs':[], 'change_deps':[]})
+                                    else:
+                                        journeys.append({"origin": origin, "destination": destination, "dep_time": dep1.strftime("%H%M"), "arr_time": arr1.strftime("%H%M"), "price": p1, 'split_stations':[], 'split_arrs':[], 'split_deps':[],'split_prices':[p1], 'nchanges': nchanges[i], 'change_stations':cstats[1:], 'change_arrs':carrs[:-1], 'change_deps':cdeps[1:]})
                         #Check for reasons to stop -- if search has gone into tomorrow or exceeded the local end
                         proceed = True  #Proceed unless there's reason not to...
                         if arr1 < overall_start_time or dep1 > local_end or maxarr > t_end:
@@ -289,9 +319,6 @@ def find_basic_info(input_parameters, alljourneys = []):
 
     alljourneys.append(unique_journeys)
 
-    # print(len(unique_journeys))
-    # for journey in unique_journeys:
-    #     print(journey["dep_time"])
     return unique_journeys
 
 def find_stations(request_info):

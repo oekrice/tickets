@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 #source ../.venv/bin/activate.csh
 #https://ojp.nationalrail.co.uk/service/timesandfares/DHM/WRS/211025/1519/dep
 
-origin = "YRK"; destination = "RCE"
+origin = "YRK"; destination = "SHF"
 request_info = {"origin": origin, 
                 "destination": destination, 
                 "start_time": datetime.time(12,0), 
@@ -20,7 +20,7 @@ request_info = {"origin": origin,
                 "ignore_previous": False,
                 "nchecks_init":100,
                 "max_extra_time":125,
-                "request_depth": 2,
+                "request_depth": 0,
                 "check_number": 0   #For the second level of request depths, which can take some time.
                 }   
 
