@@ -54,7 +54,15 @@ def trains():
         arrive_time = dt.strptime(input_data['arriveTime'].strip(), "%H:%M").time()
         depart_time = dt.strptime(input_data['departTime'].strip(), "%H:%M").time()
 
-        if input_data['requestStatus'] == 0:  #Just look for the direct trains (no splitting)
+        if input_data['requestStatus'] == -1:  #Just for checking that a route is possible...
+            request_info = {"origin": origin, 
+                            "destination": destination,
+                            "date": date, 
+                            "start_time": depart_time, 
+                            "end_time": arrive_time, 
+                            "request_depth": -1}   #Can add time constraints to this later. Or immediately? Yes, that should be the next thing.
+
+        elif input_data['requestStatus'] == 0:  #Just look for the direct trains (no splitting)
             request_info = {"origin": origin, 
                             "destination": destination,
                             "date": date, 
@@ -89,9 +97,15 @@ def trains():
                             "check_number":input_data['checkNumber']
                             }
         existing_journeys = input_data.get('trainData', []) #Obtain these to be appended to if necessary
-
         print('Received request with details', request_info, 'and', len(existing_journeys), 'existing journeys')
-        if request_info["request_depth"] == 0:
+
+        if request_info["request_depth"] == -1:
+            print('Just checking possibilities')
+            print(request_info)
+            journeys = find_basic_info(request_info, [])
+            return_data = journeys
+
+        elif request_info["request_depth"] == 0:
             #This is just a basic request. So do that.
             journeys = find_basic_info(request_info, [])
             journeys = filter_splits(request_info, journeys)

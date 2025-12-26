@@ -12,8 +12,7 @@
 <body style="font-family:arial">
     <div>Find train ticket information between two stations. <br></b>
          Input your requirements and if it's a reasonable request it'll tell you some things. <br>
-        With sincere apologies for the slowness -- I don't want to pay for the API. <br>
-        Try not to click the buttons again until the results have finished loading.</div>
+        With sincere apologies for the slowness -- I don't want to pay for the API. </div>
     <hr>
     <div>
         <label for="origin-input">Origin Station:</label>
@@ -80,6 +79,7 @@
     let detailFlag = false
     let sortOptionSet = 0
     let searchProgress = 0  //Set to 1 if there is a search happening. This disables the buttons until it finishes.
+    let stationOptions = []
 
     if (trainData == null){
         trainData = []
@@ -168,13 +168,16 @@
 
         var thereAreTrains
         thereAreTrains = true
-        //Add checker in here to see if the journey is actually possible.
-        if (requestStatus > 0){
-            let dataToSend = packageInputData(0, 0);  //Initially do a basic check to see what it comes back with
+        //Add checker in here to see if the journey is actually possible. This needs to be more nuanced I think.
+        // if (requestStatus > 0){
+        if (requestStatus > 0) {
+            let dataToSend = packageInputData(-1, 0);  //Initially do a basic check to see what it comes back with. 
+            console.log(dataToSend)
             let resultInfo 
             let parser, xmlDoc
             parser = new DOMParser()
             // console.log(dataToSend);
+
             if (!dataToSend) {
                 console.log("Insufficient data entered. Aborting.");
                 document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
@@ -203,7 +206,7 @@
 
                     //If no results found, say as much and don't display the table
                     if (trainData.length == 0) {
-                        resultInfo = "No trains found."
+                        resultInfo = "No trains found for this route and time."
                         document.getElementById("status-container").innerHTML = resultInfo;
                         document.getElementById("status-container").innerHTML = resultInfo;
                         document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
@@ -216,9 +219,8 @@
                 console.error("Network error:", error);
                 document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
                 }
-
+                console.log(trainData)
         }
-
         if (thereAreTrains){
         //If requestStatus is 0 or 1, this is simple. If not, it needs to be in a loop to obtain stations in due course. 
         if (requestStatus < 2){
@@ -226,6 +228,7 @@
             let resultInfo 
             let parser, xmlDoc
             parser = new DOMParser()
+
             // console.log(dataToSend);
             if (!dataToSend) {
                 console.log("Insufficient data entered. Aborting.");
@@ -255,7 +258,7 @@
 
                     //If no results found, say as much and don't display the table
                     if (trainData.length == 0) {
-                        resultInfo = "No trains found."
+                        resultInfo = "No (non-split) tickets found for this route and time."
                     } else {
                         resultInfo = trainData.length.toString() + " trains found between " + String(originStation) + " and " + String(destinationStation) + ". Click for more info."
                         document.getElementById("outputTable").style.display = "block";
@@ -284,6 +287,7 @@
             let resultInfo 
             let dataToSend
             let parser, xmlDoc
+
             while (i < 11){
                 dataToSend = packageInputData(requestStatus, i);   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
                 parser = new DOMParser()
@@ -406,17 +410,15 @@
         loadStations().then(stationData => {
             stationData;
             let stationTitle, fullTitle
-            let options = ""
-            //Populate the station data as soon as this is loaded? I think that might be what you're meant to do with these things... Async is a bit funny
+            let inputOptions = ""
+            //Populate the station data as soon as this is loaded? I think that might be what you're meant to do with these things... Async is a bit funny.
             for (const key in stationData){
                 stationTitle = stationData[key].station_name.substring(0,stationData[key].station_name.length-13) + " (" + key + ")"
-                options +=  "<option value='" + stationTitle +"'>"
-            }
-            document.getElementById('station-list').innerHTML = options;
+                inputOptions +=  "<option value='" + stationTitle +"'>"
+                stationOptions.push(stationTitle)
+                }
+            document.getElementById('station-list').innerHTML = inputOptions;
         })
-
-
-
 
     }
 
@@ -588,25 +590,38 @@
         let departMinutes, arriveMinutes
         //This is for taking the input data, checking if it exists and compiling into a 'dictionary' for jsonifying. Not sure what the correct approach here is but I think it's the same as python...
         originStation = document.getElementById('origin-input').value;
-        originStation = String(originStation).substring(originStation.length-4,originStation.length-1)
+        //If blank, this is fine, go for default. If not, check it is a valid option. If not, will need to say as much.
         if (!originStation) {
             originStation = "DHM"
-            // console.log("No origin station.");
-            // document.getElementById("status-container").innerHTML = "Please input an origin station and try again.";
-            // document.getElementById("result-container").innerHTML = "";
-            // document.getElementById("outputTable").style.display = "none";
-            // return;
+        } else {
+            if (stationOptions.includes(originStation)) {
+                originStation = String(originStation).substring(originStation.length-4,originStation.length-1)
+            } else {
+                console.log('Origin station not recognised');
+                document.getElementById("status-container").innerHTML = "The selected origin station cannot be found. Ensure it is picked from the given options.";
+                document.getElementById("result-container").innerHTML = "";
+                document.getElementById("outputTable").style.display = "none";
+                document.getElementById("sort-options").style.display = "none";
+                return;
+            }
         }
 
+        // Same as for the destination station. Just need to get the messaging right.
         destinationStation = document.getElementById('destination-input').value;
-        destinationStation = String(destinationStation).substring(destinationStation.length-4,destinationStation.length-1)
+        
         if (!destinationStation) {
             destinationStation = "YRK"
-            // console.log("No destination station.");
-            // document.getElementById("status-container").innerHTML = "Please input a destination station and try again.";
-            // document.getElementById("result-container").innerHTML = "";
-            // document.getElementById("outputTable").style.display = "none";
-            // return;
+        } else {
+            if (stationOptions.includes(destinationStation)) {
+                destinationStation = String(destinationStation).substring(destinationStation.length-4,destinationStation.length-1)
+            } else {
+                console.log('Destination station not recognised');
+                document.getElementById("status-container").innerHTML = "The selected destination station cannot be found. Ensure it is picked from the given options.";
+                document.getElementById("result-container").innerHTML = "";
+                document.getElementById("outputTable").style.display = "none";
+                document.getElementById("sort-options").style.display = "none";
+                return;
+            }
         }
 
         trainDate = document.getElementById('date-input').value;
@@ -639,18 +654,23 @@
             }
         }
         //If this is the first request (status == 0) then print as much. If not keep the current results. Not sure what I meant by that now.
-        if (requestStatus == 0){
-            document.getElementById("status-container").innerHTML = "Finding direct tickets only...";
+        if (requestStatus == -1){
+            document.getElementById("status-container").innerHTML = "Checking this route is possible...";
+            document.getElementById("result-container").innerHTML = "";
+            document.getElementById("outputTable").style.display = "none";
+            document.getElementById("sort-options").style.display = "none";
+        } else if (requestStatus == 0){
+            document.getElementById("status-container").innerHTML = "Finding non-split single tickets only...";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
             document.getElementById("sort-options").style.display = "none";
         } else if (requestStatus == 1){
-            document.getElementById("status-container").innerHTML = "Finding single split tickets. <br> Should take less than 5 minutes but may occasionally be longer.";
+            document.getElementById("status-container").innerHTML = "Finding singly-split tickets. <br> Should take less than 5 minutes but may occasionally be longer.";
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
             document.getElementById("sort-options").style.display = "none";
         } else if (checkNumber == 0) {
-            document.getElementById("status-container").innerHTML = "Finding detailed split tickets. <br> This may take up to half an hour or so but the results below will update as it goes."
+            document.getElementById("status-container").innerHTML = "Finding many-split tickets. <br> This may take up to half an hour or so but the results below will update as it goes."
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
             document.getElementById("sort-options").style.display = "none";
