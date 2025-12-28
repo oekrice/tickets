@@ -41,7 +41,8 @@
     <div>
         <button id = "runButton1"; class="runButton" ; onclick=getTrains(0)>Find tickets with no splits</button> <br>
         <button id = "runButton2"; class="runButton" ; onclick=getTrains(1)>FInd tickets with up to one split (Max. 5 mins to search)</button> <br>
-        <button id = "runButton3"; class="runButton" ; onclick=getTrains(2)>Find tickets with potentially many splits (Max. 30 mins to search)</button>
+        <button id = "runButton3"; class="runButton" ; onclick=getTrains(2)>Find tickets with potentially many splits (Max. 30 mins to search)</button> <br>
+        Do a 'quick' search version for the many-split request: <input type="checkbox" id="quickResult" onclick="changeQuick()">
     </div>
     <hr>
     <div id="status-container"></div>
@@ -80,6 +81,8 @@
     let sortOptionSet = 0
     let searchProgress = 0  //Set to 1 if there is a search happening. This disables the buttons until it finishes.
     let stationOptions = []
+    let quickOption = false
+
 
     if (trainData == null){
         trainData = []
@@ -105,6 +108,16 @@
     //     document.getElementById("sort-options").style.display = "block";
     
     //  })
+
+    function changeQuick(){
+
+        var checkBox = document.getElementById("quickResult");
+        if (checkBox.checked == true){
+            quickOption = true;
+        } else {
+            quickOption = false;
+        }
+    }
 
     function sortTrains(sortOption){
         //Sorts the results in place based on the selected option 
@@ -680,9 +693,9 @@
         //If there is already some train data, send this along with the python so it doesn't need to be done multiple times. Filtering will take longer but I think that's fine.
 
         if (trainData.length > 0){
-            inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":trainDate, "departTime": departTime, "arriveTime": arriveTime, "checkNumber": checkNumber, "trainData":trainData};
+            inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":trainDate, "departTime": departTime, "arriveTime": arriveTime, "checkNumber": checkNumber, "trainData":trainData, "quick": quickOption};
         } else {
-        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":trainDate, "departTime": departTime, "arriveTime": arriveTime, "checkNumber": checkNumber};
+        inputParameters = {"requestStatus":requestStatus, "origin":originStation, "destination":destinationStation, "date":trainDate, "departTime": departTime, "arriveTime": arriveTime, "checkNumber": checkNumber, "quick": quickOption};
         }
         console.log(inputParameters)
         return inputParameters;

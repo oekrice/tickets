@@ -84,24 +84,27 @@ def trains():
                             }
 
         elif input_data['requestStatus'] == 2:  #Look for more splits. Now depends on a status so it can update in due course.
+            if input_data['quick'] and input_data['checkNumber'] > 0:
+                nchecks_init = 10
+            else:
+                nchecks_init = 100
             request_info = {"origin": origin,
                             "destination": destination,
                             "date": date,
                             "start_time": depart_time,
                             "end_time": arrive_time,
                             "ignore_previous": False,
-                            "nchecks_init":100,
+                            "nchecks_init":nchecks_init,
                             "max_extra_time":125,
                             "time_spread":10,
                             "request_depth":2,
                             "check_number":input_data['checkNumber']
                             }
+            
         existing_journeys = input_data.get('trainData', []) #Obtain these to be appended to if necessary
         print('Received request with details', request_info, 'and', len(existing_journeys), 'existing journeys')
 
         if request_info["request_depth"] == -1:
-            print('Just checking possibilities')
-            print(request_info)
             journeys = find_basic_info(request_info, [])
             return_data = journeys
 
@@ -158,7 +161,7 @@ def trains():
         with open('testdata.json', "w") as f:
             json.dump(return_data, f)
       
-        return flask.Response(response=json.dumps(return_data), status=201, mimetype='application/json' )
+        return flask.Response(response=json.dumps(return_data), status=201, mimetype='application/json')
 
 #This bit should come last, I think, as it calls things from above
 if __name__ == "__main__":

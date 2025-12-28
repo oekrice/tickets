@@ -77,6 +77,7 @@ def find_second_splits(request_info, station):
     input_parameters_first["destination"] = station[0]
     input_parameters_first["end_time"] = time(hour = int((station[2] + 5)//60), minute = int((station[2] + 5)%60))
 
+    print('Second split request info', request_info)
     station_info = find_stations(input_parameters_first)
     station_checks = rank_stations(input_parameters_first, station_info, 1)
 
