@@ -197,6 +197,7 @@ def find_first_splits(request_info, station_checks):
     nrequests_actual = len(allchecks)/nlumps + 1
     individual_journeys = []
 
+    print('This is a stage 1 split check between stations', request_info["origin"], 'and', request_info["destination"], ', with ', len(allchecks), ' checks')
     if len(allchecks) == 0:
         return {}
     
@@ -250,8 +251,15 @@ def find_first_splits(request_info, station_checks):
     #Find combinations of these which work. Would like to put a time limit in here, ideally, but not sure where to obtain such information. Maybe just not do this for now. Yes.
     print('All trains found and changes checked. Finding valid combinations.')
     splits = []
+    #Need to log the minimum time here, so can do a basic quick filter. Otherwise can get out of hand with the quadraticness.
+    mintime = 60*24
+    def tominutes(timestring):
+        return 60*(float(timestring)//100) + float(timestring)%100
+    
     for i1, j1 in enumerate(alljourneys):
         for i2, j2 in enumerate(alljourneys):
+            #For speed reasons I think it's probably worth putting an upper time limit in here. 
+            #Three hours beyond the maximum? Not sure how to determine the maximum though...
             if j1["destination"] == j2["origin"]:
 
                 change_time = 0.0   #Assume this isn't a change unless otherwise informed (if it doesn't appear in an otherwise-populated list)
@@ -270,6 +278,7 @@ def find_first_splits(request_info, station_checks):
                 else:
                     latest_arrival = float(j2["dep_time"]) - change_time
 
+                
                 if float(j1["arr_time"]) <= latest_arrival:
                     #This is potentially valid. Combine into a single journey object.
                     #Determine existing split stations here.
@@ -290,6 +299,8 @@ def find_first_splits(request_info, station_checks):
                             'change_arrs': j1["change_arrs"] + [j1["arr_time"]] + j2['change_arrs'],
                             'change_deps': j1['change_deps'] + [j2["dep_time"]] + j2['change_deps']
                         })
+                        
+                        mintime = min(mintime,  tominutes(j2['arr_time']) - tominutes(j1['dep_time']))
                     else:   #Don't need to add any changes
                         splits.append({
                             'origin':j1['origin'], 'destination': j2['destination'],
@@ -303,6 +314,7 @@ def find_first_splits(request_info, station_checks):
                             'change_arrs': j1["change_arrs"] + j2['change_arrs'],
                             'change_deps': j1['change_deps'] + j2['change_deps']
                         })
+                        mintime = min(mintime,  tominutes(j2['arr_time']) - tominutes(j1['dep_time']))
 
             if j1["origin"] == request_info["origin"] and j1["destination"] == request_info["destination"]:   #This is a valid journey without anything else
                     splits.append({
@@ -316,8 +328,16 @@ def find_first_splits(request_info, station_checks):
                         'change_stations':j1['change_stations'], 'change_arrs': j1["change_arrs"],
                         'change_deps': j1['change_deps']
                     })
+                    mintime = min(mintime,  tominutes(j1['arr_time']) - tominutes(j1['dep_time']))
 
-    return splits
+    #Filter out journeys based on this maximum time
+    textra = 180 #I think it's probably fine to hard-code this in. Yeah.
+    timesplits = []
+    for split in splits:
+        if tominutes(split['arr_time'])- tominutes(split['dep_time']) <= mintime + textra:
+            timesplits.append(split)
+
+    return timesplits
 
 def filter_splits(request_info, unfiltered_splits):
     #Uses the price matrix approach to filter the splits. Current going to base it on departure time and journey length. Resolution will depend on how long such things take...

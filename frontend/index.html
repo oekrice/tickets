@@ -300,7 +300,7 @@
             let resultInfo 
             let dataToSend
             let parser, xmlDoc
-
+            let pcDone
             while (i < 11){
                 dataToSend = packageInputData(requestStatus, i);   //This also gives a message to the output lump. Currently unsure where we tell the output lump to get its thing but meh.
                 parser = new DOMParser()
@@ -335,7 +335,8 @@
                             document.querySelectorAll('.runButton').forEach(btn => btn.disabled = false);
 
                         } else if (trainData.length > 0) {
-                            resultInfo = 'Still finding trains... Currently found ' + trainData.length.toString() + " trains between " + String(originStation) + " and " + String(destinationStation) + ".<br>Wait a bit longer and these might get cheaper. Click for more info."
+                            pcDone = (i+1)*10
+                            resultInfo = 'Still finding trains... Currently found ' + trainData.length.toString() + " trains between " + String(originStation) + " and " + String(destinationStation) + ".<br> >"+ pcDone + "% complete. Might get cheaper if you wait. Click for more info."
                             document.getElementById("outputTable").style.display = "block";
                             document.getElementById("sort-options").style.display = "block";
                             document.querySelectorAll('.runButton').forEach(btn => btn.disabled = true);
@@ -683,12 +684,15 @@
             document.getElementById("outputTable").style.display = "none";
             document.getElementById("sort-options").style.display = "none";
         } else if (checkNumber == 0) {
-            document.getElementById("status-container").innerHTML = "Finding many-split tickets. <br> This may take up to half an hour or so but the results below will update as it goes."
+            document.getElementById("status-container").innerHTML = "Finding comprehensive split tickets. <br> This may take quite a while: the results below will update progressively."
             document.getElementById("result-container").innerHTML = "";
             document.getElementById("outputTable").style.display = "none";
             document.getElementById("sort-options").style.display = "none";
         }
         
+        if (requestStatus == 2) {
+            console.log('Check number', checkNumber)
+        }
         //If it's got this far, there are at least origin and destination stations
         //If there is already some train data, send this along with the python so it doesn't need to be done multiple times. Filtering will take longer but I think that's fine.
 
