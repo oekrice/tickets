@@ -331,13 +331,13 @@ def find_first_splits(request_info, station_checks):
                     mintime = min(mintime,  tominutes(j1['arr_time']) - tominutes(j1['dep_time']))
 
     #Filter out journeys based on this maximum time
-    textra = 180 #I think it's probably fine to hard-code this in. Yeah.
-    timesplits = []
-    for split in splits:
-        if tominutes(split['arr_time'])- tominutes(split['dep_time']) <= mintime + textra:
-            timesplits.append(split)
+    # textra = 180 #I think it's probably fine to hard-code this in. Yeah.
+    # timesplits = []
+    # for split in splits:
+    #     if tominutes(split['arr_time'])- tominutes(split['dep_time']) <= mintime + textra:
+    #         timesplits.append(split)
 
-    return timesplits
+    return splits
 
 def filter_splits(request_info, unfiltered_splits):
     #Uses the price matrix approach to filter the splits. Current going to base it on departure time and journey length. Resolution will depend on how long such things take...

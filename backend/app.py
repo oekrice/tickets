@@ -101,7 +101,11 @@ def trains():
                             "check_number":input_data['checkNumber']
                             }
             
-        existing_journeys = input_data.get('trainData', []) #Obtain these to be appended to if necessary
+        if (request_info["request_depth"] == 2 and request_info["check_number"] > 0):
+            existing_journeys = input_data.get('trainData', []) #Obtain these to be appended to if necessary
+        else:
+            existing_journeys = []
+            
         print('Received request with details', request_info, 'and', len(existing_journeys), 'existing journeys')
 
         if request_info["request_depth"] == -1:
